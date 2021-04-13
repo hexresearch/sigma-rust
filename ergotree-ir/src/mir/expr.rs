@@ -57,6 +57,7 @@ use super::value::Value;
 extern crate derive_more;
 use derive_more::From;
 use derive_more::TryInto;
+use crate::mir::slice::Slice;
 
 #[derive(PartialEq, Eq, Debug, Clone, From, TryInto)]
 /// Expression in ErgoTree
@@ -128,6 +129,8 @@ pub enum Expr {
     Fold(Fold),
     /// Collection map op
     Map(Map),
+    /// FIXME: Slice
+    Slice(Slice),
     /// Collection filter op
     Filter(Filter),
     /// Tests whether a predicate holds for at least one element of this collection
@@ -179,6 +182,7 @@ impl Expr {
             Expr::Or(op) => op.op_code(),
             Expr::LogicalNot(op) => op.op_code(),
             Expr::Map(op) => op.op_code(),
+            Expr::Slice(op) => op.op_code(),
             Expr::Filter(op) => op.op_code(),
             Expr::BoolToSigmaProp(op) => op.op_code(),
             Expr::Upcast(op) => op.op_code(),
@@ -228,6 +232,7 @@ impl Expr {
             Expr::Or(v) => v.tpe(),
             Expr::LogicalNot(v) => v.tpe(),
             Expr::Map(v) => v.tpe(),
+            Expr::Slice(v) => v.tpe(),
             Expr::Filter(v) => v.tpe(),
             Expr::BoolToSigmaProp(v) => v.tpe(),
             Expr::Upcast(v) => v.tpe(),

@@ -11,6 +11,7 @@ use crate::mir::calc_blake2b256::CalcBlake2b256;
 use crate::mir::coll_by_index::ByIndex;
 use crate::mir::coll_exists::Exists;
 use crate::mir::coll_filter::Filter;
+use crate::mir::slice::Slice;
 use crate::mir::coll_fold::Fold;
 use crate::mir::coll_forall::ForAll;
 use crate::mir::coll_map::Map;
@@ -91,6 +92,7 @@ impl SigmaSerializable for Expr {
                     Expr::Or(op) => op.sigma_serialize(w),
                     Expr::LogicalNot(op) => op.sigma_serialize(w),
                     Expr::Map(op) => op.sigma_serialize(w),
+                    Expr::Slice(op) => op.sigma_serialize(w),
                     Expr::Filter(op) => op.sigma_serialize(w),
                     Expr::BoolToSigmaProp(op) => op.sigma_serialize(w),
                     Expr::Upcast(op) => op.sigma_serialize(w),
@@ -187,6 +189,7 @@ impl SigmaSerializable for Expr {
                 OpCode::COLL => Ok(coll_sigma_parse(r)?.into()),
                 OpCode::COLL_OF_BOOL_CONST => Ok(bool_const_coll_sigma_parse(r)?.into()),
                 Map::OP_CODE => Ok(Map::sigma_parse(r)?.into()),
+                Slice::OP_CODE => Ok(Slice::sigma_parse(r)?.into()),
                 Filter::OP_CODE => Ok(Filter::sigma_parse(r)?.into()),
                 Exists::OP_CODE => Ok(Exists::sigma_parse(r)?.into()),
                 ForAll::OP_CODE => Ok(ForAll::sigma_parse(r)?.into()),

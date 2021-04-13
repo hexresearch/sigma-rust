@@ -65,6 +65,8 @@ pub mod sigma_and;
 pub mod sigma_or;
 /// Extract serialized bytes of a SigmaProp value
 pub mod sigma_prop_bytes;
+/// Slice collection
+pub mod slice;
 /// Tuple of elements
 pub mod tuple;
 pub mod upcast;

@@ -33,6 +33,7 @@ impl Evaluable for Expr {
             Expr::Or(op) => op.eval(env, ctx),
             Expr::LogicalNot(op) => op.eval(env, ctx),
             Expr::Map(op) => op.eval(env, ctx),
+            Expr::Slice(_) => todo!(),
             Expr::Filter(op) => op.eval(env, ctx),
             Expr::BoolToSigmaProp(op) => op.eval(env, ctx),
             Expr::Upcast(op) => op.eval(env, ctx),
