@@ -1,6 +1,8 @@
 //! Mid-level IR (ErgoTree)
 
 pub mod and;
+/// Append two collections
+pub mod append;
 pub mod apply;
 pub mod bin_op;
 pub mod block;

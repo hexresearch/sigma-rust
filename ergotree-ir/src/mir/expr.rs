@@ -55,9 +55,10 @@ use super::val_use::ValUse;
 use super::value::Value;
 
 extern crate derive_more;
+use crate::mir::append::Append;
+use crate::mir::slice::Slice;
 use derive_more::From;
 use derive_more::TryInto;
-use crate::mir::slice::Slice;
 
 #[derive(PartialEq, Eq, Debug, Clone, From, TryInto)]
 /// Expression in ErgoTree
@@ -130,6 +131,8 @@ pub enum Expr {
     /// Collection map op
     Map(Map),
     /// FIXME: Slice
+    Append(Append),
+    /// FIXME: Slice
     Slice(Slice),
     /// Collection filter op
     Filter(Filter),
@@ -182,6 +185,7 @@ impl Expr {
             Expr::Or(op) => op.op_code(),
             Expr::LogicalNot(op) => op.op_code(),
             Expr::Map(op) => op.op_code(),
+            Expr::Append(op) => op.op_code(),
             Expr::Slice(op) => op.op_code(),
             Expr::Filter(op) => op.op_code(),
             Expr::BoolToSigmaProp(op) => op.op_code(),
@@ -232,6 +236,7 @@ impl Expr {
             Expr::Or(v) => v.tpe(),
             Expr::LogicalNot(v) => v.tpe(),
             Expr::Map(v) => v.tpe(),
+            Expr::Append(v) => v.tpe(),
             Expr::Slice(v) => v.tpe(),
             Expr::Filter(v) => v.tpe(),
             Expr::BoolToSigmaProp(v) => v.tpe(),

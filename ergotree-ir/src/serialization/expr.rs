@@ -2,6 +2,7 @@ use super::bin_op::bin_op_sigma_parse;
 use super::bin_op::bin_op_sigma_serialize;
 use super::{op_code::OpCode, sigma_byte_writer::SigmaByteWrite};
 use crate::mir::and::And;
+use crate::mir::append::Append;
 use crate::mir::apply::Apply;
 use crate::mir::bin_op::ArithOp;
 use crate::mir::bin_op::RelationOp;
@@ -92,6 +93,7 @@ impl SigmaSerializable for Expr {
                     Expr::Or(op) => op.sigma_serialize(w),
                     Expr::LogicalNot(op) => op.sigma_serialize(w),
                     Expr::Map(op) => op.sigma_serialize(w),
+                    Expr::Append(op) => op.sigma_serialize(w),
                     Expr::Slice(op) => op.sigma_serialize(w),
                     Expr::Filter(op) => op.sigma_serialize(w),
                     Expr::BoolToSigmaProp(op) => op.sigma_serialize(w),
@@ -189,6 +191,7 @@ impl SigmaSerializable for Expr {
                 OpCode::COLL => Ok(coll_sigma_parse(r)?.into()),
                 OpCode::COLL_OF_BOOL_CONST => Ok(bool_const_coll_sigma_parse(r)?.into()),
                 Map::OP_CODE => Ok(Map::sigma_parse(r)?.into()),
+                Append::OP_CODE => Ok(Append::sigma_parse(r)?.into()),
                 Slice::OP_CODE => Ok(Slice::sigma_parse(r)?.into()),
                 Filter::OP_CODE => Ok(Filter::sigma_parse(r)?.into()),
                 Exists::OP_CODE => Ok(Exists::sigma_parse(r)?.into()),
