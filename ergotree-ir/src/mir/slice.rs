@@ -7,14 +7,14 @@ use crate::serialization::SerializationError;
 use crate::serialization::SigmaSerializable;
 use crate::types::stype::SType;
 
-/// Logical OR op on collection of SBoolean values
+/// Selects an interval of elements
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Slice {
     /// Input collection
     pub input: Box<Expr>,
-    /// FIXME: Doc
+    /// The lowest index to include from this collection
     pub from: Box<Expr>,
-    /// FIXME: Doc
+    /// The lowest index to EXCLUDE from this collection
     pub until: Box<Expr>,
 }
 
@@ -42,50 +42,62 @@ impl SigmaSerializable for Slice {
         let input = Expr::sigma_parse(r)?.into();
         let from = Expr::sigma_parse(r)?.into();
         let until = Expr::sigma_parse(r)?.into();
-        Ok(Self{input, from, until})
+        Ok(Self { input, from, until })
     }
 }
 
-// #[cfg(feature = "arbitrary")]
-// /// Arbitrary impl
-// mod arbitrary {
-//     use crate::mir::expr::arbitrary::ArbExprParams;
-//
-//     use super::*;
-//
-//     use proptest::prelude::*;
-//
-//     impl Arbitrary for Slice {
-//         type Strategy = BoxedStrategy<Self>;
-//         type Parameters = usize;
-//
-//         fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
-//             any_with::<Expr>(ArbExprParams {
-//                 tpe: SType::SColl(SType::SBoolean.into()),
-//                 depth: args,
-//             })
-//             .prop_map(|input| Self {
-//                 input: input.into(),
-//             })
-//             .boxed()
-//         }
-//     }
-// }
+#[cfg(feature = "arbitrary")]
+/// Arbitrary impl
+mod arbitrary {
+    use super::*;
+    use crate::mir::expr::arbitrary::ArbExprParams;
+    use proptest::prelude::*;
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::mir::expr::Expr;
-//     use crate::serialization::sigma_serialize_roundtrip;
-//     use proptest::prelude::*;
-//
-//     proptest! {
-//
-//         #[test]
-//         fn ser_roundtrip(v in any_with::<Or>(1)) {
-//             let expr: Expr = v.into();
-//             prop_assert_eq![sigma_serialize_roundtrip(&expr), expr];
-//         }
-//
-//     }
-// }
+    impl Arbitrary for Slice {
+        type Strategy = BoxedStrategy<Self>;
+        type Parameters = ();
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            (
+                any_with::<Expr>(ArbExprParams {
+                    tpe: SType::SColl(SType::SInt.into()),
+                    depth: 1,
+                }),
+                any_with::<Expr>(ArbExprParams {
+                    tpe: SType::SInt,
+                    depth: 0,
+                }),
+                any_with::<Expr>(ArbExprParams {
+                    tpe: SType::SInt,
+                    depth: 0,
+                }),
+            )
+                .prop_map(|(input, from, until)| Self {
+                    input: input.into(),
+                    from: from.into(),
+                    until: until.into(),
+                })
+                .boxed()
+        }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "arbitrary")]
+mod tests {
+    use super::*;
+    use crate::mir::expr::Expr;
+    use crate::serialization::sigma_serialize_roundtrip;
+    use proptest::prelude::*;
+
+    proptest! {
+
+        #[test]
+        fn ser_roundtrip(v in any::<Slice>()) {
+            dbg!(&v);
+            let expr: Expr = v.into();
+            prop_assert_eq![sigma_serialize_roundtrip(&expr), expr];
+        }
+
+    }
+}
