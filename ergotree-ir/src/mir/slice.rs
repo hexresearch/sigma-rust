@@ -55,13 +55,13 @@ mod arbitrary {
 
     impl Arbitrary for Slice {
         type Strategy = BoxedStrategy<Self>;
-        type Parameters = ();
+        type Parameters = usize;
 
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
             (
                 any_with::<Expr>(ArbExprParams {
                     tpe: SType::SColl(SType::SInt.into()),
-                    depth: 1,
+                    depth: args,
                 }),
                 any_with::<Expr>(ArbExprParams {
                     tpe: SType::SInt,

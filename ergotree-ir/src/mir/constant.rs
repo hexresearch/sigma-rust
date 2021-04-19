@@ -275,6 +275,7 @@ pub(crate) mod arbitrary {
             SType::SColl(elem_tpe) => match *elem_tpe {
                 SType::SByte => vec(any::<u8>(), 0..400).prop_map_into().boxed(),
                 SType::SBoolean => vec(any::<bool>(), 0..400).prop_map_into().boxed(),
+                SType::SInt => vec(any::<i32>(), 0..400).prop_map_into().boxed(),
                 _ => todo!(),
             },
             // SType::STuple(_) => {}

@@ -470,6 +470,9 @@ pub(crate) mod arbitrary {
             SType::SBoolean => any_with::<Constant>(SType::SColl(Box::new(SType::SBoolean)).into())
                 .prop_map(Expr::Const)
                 .boxed(),
+            SType::SInt => any_with::<Constant>(SType::SColl(Box::new(SType::SInt)).into())
+                .prop_map(Expr::Const)
+                .boxed(),
             _ => todo!("Collection of {0:?} is not yet implemented", elem_tpe),
         }
     }
