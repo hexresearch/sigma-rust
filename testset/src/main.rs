@@ -7,8 +7,10 @@ use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
 use rusqlite;
 use sigma_ser::peekable_reader::PeekableReader;
-use sigma_ser::vlq_encode::ReadSigmaVlqExt;
+use sigma_ser::vlq_encode::{ReadSigmaVlqExt,WriteSigmaVlqExt};
 use std::io::Cursor;
+use ergotree_ir::serialization::sigma_byte_writer::SigmaByteWriter;
+use ergotree_ir::serialization::SerializationError::Misc;
 
 fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
     let mut buf = bytes.to_owned();
@@ -16,14 +18,39 @@ fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
     let pr = PeekableReader::new(cursor);
     let mut sr = SigmaByteReader::new(pr, ConstantStore::empty());
     let r = &mut sr;
-    //
-    let mut n_tx = r.get_u32()?;
-    if n_tx == 10000002 {
-        n_tx = r.get_u32()?;
+
+    // Parse block
+    let (n_tx, after_fork) = {
+        let n = r.get_u32()?;
+        if n == 10000002 {
+            (r.get_u32()?, true)
+        } else {
+            (n,false)
+        }
+    };
+    let txs = {
+        let mut txs = Vec::with_capacity(n_tx as usize);
+        for _ in 0..n_tx {
+            txs.push(Transaction::sigma_parse(r)?);
+        }
+        txs
+    };
+    // Write block back
+    let mut data = Vec::new();
+    let mut w = SigmaByteWriter::new(&mut data, None);
+    if after_fork {
+        w.put_u32(10000002)?;
     }
-    for _ in 1..n_tx {
-        Transaction::sigma_parse(r)?;
+    w.put_u32(n_tx)?;
+    for tx in txs {
+        tx.sigma_serialize(&mut w)?;
     }
+    if data != buf {
+        // println!("{:?}", buf);
+        // println!("{:?}", data);
+        Err(Misc("Roundtrip failed".into()))?
+    }
+    //self.sigma_serialize(&mut w)?;
     Ok("AZAZA".to_string())
 }
 
