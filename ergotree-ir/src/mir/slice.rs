@@ -1,5 +1,6 @@
 // FIXME: Doc
 use super::expr::Expr;
+use super::expr::InvalidArgumentError;
 use crate::serialization::op_code::OpCode;
 use crate::serialization::sigma_byte_reader::SigmaByteRead;
 use crate::serialization::sigma_byte_writer::SigmaByteWrite;
@@ -20,6 +21,40 @@ pub struct Slice {
 
 impl Slice {
     pub(crate) const OP_CODE: OpCode = OpCode::SLICE;
+
+    /// Create new object, returns an error if any of the requirements failed
+    pub fn new(input: Expr, from: Expr, until: Expr) -> Result<Self, InvalidArgumentError> {
+
+        let _input_elem_tpe: SType = *match input.post_eval_tpe() {
+            SType::SColl(elem_type) => Ok(elem_type),
+            _ => Err(InvalidArgumentError(format!(
+                "Expected Slice input to be SColl, got {0:?}",
+                input.tpe()
+            ))),
+        }?;
+
+        let _from_ok = match from.post_eval_tpe() {
+            SType::SInt => Ok(()),
+            _ => Err(InvalidArgumentError(format!(
+                "Expected Slice from to be int-like, got {0:?}",
+                from.tpe()
+            ))),
+        }?;
+
+        let _until_ok = match until.post_eval_tpe() {
+            SType::SInt => Ok(()),
+            _ => Err(InvalidArgumentError(format!(
+                "Expected Slice until to be int-like, got {0:?}",
+                until.tpe()
+            ))),
+        }?;
+
+        Ok(Slice {
+            input: input.into(),
+            from: from.into(),
+            until: until.into(),
+        })
+    }
 
     /// Type
     pub fn tpe(&self) -> SType {

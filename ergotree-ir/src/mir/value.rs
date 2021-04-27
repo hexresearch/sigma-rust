@@ -362,6 +362,22 @@ impl TryExtractFrom<Value> for BigInt {
     }
 }
 
+impl TryExtractFrom<Value> for usize {
+    fn try_extract_from(v: Value) -> Result<Self, TryExtractFromError> {
+        match v {
+            Value::Byte(j) => Ok(j as usize),
+            Value::Short(j) => Ok(j as usize),
+            Value::Int(j) => Ok(j as usize),
+            Value::Long(j) => Ok(j as usize),
+            _ => Err(TryExtractFromError(format!(
+                "expected {:?}, found {:?}",
+                std::any::type_name::<Self>(),
+                v
+            ))),
+        }
+    }
+}
+
 impl TryFrom<Value> for ProveDlog {
     type Error = TryExtractFromError;
     fn try_from(cv: Value) -> Result<Self, Self::Error> {

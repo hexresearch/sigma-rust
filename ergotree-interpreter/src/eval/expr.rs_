@@ -100,6 +100,8 @@ pub enum Expr {
     Map(Map),
     /// Collection filter op
     Filter(Filter),
+    /// Collection slice op
+    Slice(Slice),
     /// Tuple field access
     SelectField(SelectField),
     /// Box monetary value
@@ -138,6 +140,7 @@ impl Expr {
             Expr::LogicalNot(op) => op.op_code(),
             Expr::Map(op) => op.op_code(),
             Expr::Filter(op) => op.op_code(),
+            Expr::Slice(op) => op.op_code(),
             Expr::BoolToSigmaProp(op) => op.op_code(),
             Expr::Upcast(op) => op.op_code(),
             Expr::If(op) => op.op_code(),
@@ -174,6 +177,7 @@ impl Expr {
             Expr::LogicalNot(v) => v.tpe(),
             Expr::Map(v) => v.tpe(),
             Expr::Filter(v) => v.tpe(),
+            Expr::Slice(v) => v.tpe(),
             Expr::BoolToSigmaProp(v) => v.tpe(),
             Expr::Upcast(v) => v.tpe(),
             Expr::If(v) => v.tpe(),
