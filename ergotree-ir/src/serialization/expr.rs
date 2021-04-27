@@ -83,6 +83,10 @@ impl Expr {
             Ok(Expr::Const(constant))
         } else {
             let op_code = OpCode::parse(tag);
+            // println!("{} / 0x{:x} (shift {})",
+            //         op_code.value(),
+            //          op_code.value(),
+            //         op_code.shift());
             match op_code {
                 OpCode::APPEND => Ok(Append::sigma_parse(r)?.into()),
                 OpCode::FOLD => Ok(Fold::sigma_parse(r)?.into()),

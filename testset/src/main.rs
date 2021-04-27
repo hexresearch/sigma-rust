@@ -2,15 +2,17 @@ use ergotree_ir::serialization::constant_store::ConstantStore;
 use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::SerializationError;
 use ergotree_ir::serialization::SigmaSerializable;
+use ergotree_ir::mir::expr::Expr;
 
 use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
 use rusqlite;
 use sigma_ser::peekable_reader::PeekableReader;
 use sigma_ser::vlq_encode::{ReadSigmaVlqExt,WriteSigmaVlqExt};
-use std::io::Cursor;
+use std::io::{Cursor, Seek};
 use ergotree_ir::serialization::sigma_byte_writer::SigmaByteWriter;
 use ergotree_ir::serialization::SerializationError::Misc;
+use std::io;
 
 fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
     let mut buf = bytes.to_owned();
@@ -30,8 +32,37 @@ fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
     };
     let txs = {
         let mut txs = Vec::with_capacity(n_tx as usize);
-        for _ in 0..n_tx {
-            txs.push(Transaction::sigma_parse(r)?);
+        for i in 0..n_tx {
+            let tx = Transaction::sigma_parse(r)?;
+            let tx2 = Transaction::sigma_parse_bytes(tx.sigma_serialize_bytes())?;
+            //
+            let a = &tx.output_candidates[0].ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap();
+            let b = &tx2.output_candidates[0].ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap();
+            fn drill(e: &Expr) -> Option<Expr> {
+                match e {
+                    Expr::BlockValue(v) => Some(v.items[6].clone()),
+                    _ => None,
+                }
+            }
+            if a != b {
+                match(drill(a),drill(b)) {
+                    (Some(a), Some(b)) => {
+                        println!("{:?}",a);
+                        println!("");
+                        println!("{:?}",b);
+                        println!("{}",a==b);
+                    },
+                    (Some(a), None) => println!("A"),
+                    (None, Some(b)) => println!("B"),
+                    (None, None) => println!("NON"),
+                }
+                //     (Expr::BlockValue(v1), Expr::BlockValue(v2)) =>
+                //
+                // }
+                // println!("{:?}",a);
+            }
+            txs.push(tx);
+            println!("N={}, off={:?}", i, r.inner.inner.seek(io::SeekFrom::Current(0)));
         }
         txs
     };
@@ -46,6 +77,13 @@ fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
         tx.sigma_serialize(&mut w)?;
     }
     if data != buf {
+        println!("N_tx = {}, N_b = {}->{}", n_tx, buf.len(), data.len());
+        buf.iter().zip(data).enumerate().for_each(|(i,(b1,b2))| {
+            if *b1 != b2 {
+                println!("{}: {} {}", i, b1, b2);
+            }
+        });
+        // zip()
         // println!("{:?}", buf);
         // println!("{:?}", data);
         Err(Misc("Roundtrip failed".into()))?

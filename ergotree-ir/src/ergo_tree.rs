@@ -24,9 +24,10 @@ use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-struct ParsedTree {
+pub struct ParsedTree {
     constants: Vec<Constant>,
-    root: Result<Rc<Expr>, ErgoTreeRootParsingError>,
+    /// XX
+    pub root: Result<Rc<Expr>, ErgoTreeRootParsingError>,
 }
 
 impl ParsedTree {
