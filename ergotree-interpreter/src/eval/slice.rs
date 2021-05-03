@@ -32,70 +32,52 @@ impl Evaluable for Slice {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::rc::Rc;
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
 
-//     use crate::eval::context::Context;
-//     use crate::eval::tests::eval_out;
+    use crate::eval::context::Context;
+    use crate::eval::tests::eval_out;
 
-//     use super::*;
+    use super::*;
 
-//     use ergotree_ir::ir_ergo_box::IrBoxId;
-//     use ergotree_ir::mir::bin_op::BinOp;
-//     use ergotree_ir::mir::bin_op::RelationOp;
-//     use ergotree_ir::mir::expr::Expr;
-//     use ergotree_ir::mir::extract_amount::ExtractAmount;
-//     use ergotree_ir::mir::func_value::FuncArg;
-//     use ergotree_ir::mir::func_value::FuncValue;
-//     use ergotree_ir::mir::property_call::PropertyCall;
-//     use ergotree_ir::mir::val_use::ValUse;
-//     use ergotree_ir::types::scontext;
-//     use ergotree_ir::types::stype::SType;
-//     use proptest::prelude::*;
+    // use ergotree_ir::ir_ergo_box::IrBoxId;
+    // use ergotree_ir::mir::bin_op::BinOp;
+    // use ergotree_ir::mir::bin_op::RelationOp;
+    use ergotree_ir::mir::expr::Expr;
+    // use ergotree_ir::mir::extract_amount::ExtractAmount;
+    // use ergotree_ir::mir::func_value::FuncArg;
+    // use ergotree_ir::mir::func_value::FuncValue;
+    use ergotree_ir::mir::property_call::PropertyCall;
+    // use ergotree_ir::mir::val_use::ValUse;
+    use ergotree_ir::types::scontext;
+    // use ergotree_ir::types::stype::SType;
+    use proptest::prelude::*;
 
-//     proptest! {
+    proptest! {
 
-//         #![proptest_config(ProptestConfig::with_cases(16))]
+        #![proptest_config(ProptestConfig::with_cases(16))]
 
-//         #[test]
-//         fn eval_box_value(ctx in any::<Context>()) {
-//             let data_inputs: Expr = PropertyCall::new(Expr::Context, scontext::DATA_INPUTS_PROPERTY.clone()).unwrap()
-//             .into();
-//             let val_use: Expr = ValUse {
-//                 val_id: 1.into(),
-//                 tpe: SType::SBox,
-//             }
-//             .into();
-//             let body: Expr = BinOp {
-//                 kind: RelationOp::Le.into(),
-//                 left: Box::new(Expr::Const(1i64.into())),
-//                 right: Box::new(Expr::ExtractAmount(
-//                         ExtractAmount::new(val_use)
-//                     .unwrap(),
-//                 )),
-//             }
-//             .into();
-//             let expr: Expr = Slice::new(
-//                 data_inputs,
-//                 FuncValue::new(
-//                     vec![FuncArg {
-//                         idx: 1.into(),
-//                         tpe: SType::SBox,
-//                     }],
-//                     body,
-//                 )
-//                 .into(),
-//             )
-//             .unwrap()
-//             .into();
-//             let ctx = Rc::new(ctx);
-//             assert_eq!(
-//                 eval_out::<Vec<IrBoxId>>(&expr, ctx.clone()),
-//                 ctx.data_inputs.clone()
-//                     .into_iter()
-//                     .filter(| b| 1 <= b.get_box(&ctx.box_arena).unwrap().value()).collect::<Vec<IrBoxId>>()
-//             );
-//         }
-//     }
-// }
+        #[test]
+        fn eval(ctx in any::<Context>()) {
+            let data_inputs: Expr = PropertyCall::new(Expr::Context, scontext::DATA_INPUTS_PROPERTY.clone()).unwrap()
+            .into();
+            let expr: Expr = Slice::new(
+                data_inputs,
+                1.into(),
+                3.into(),
+            )
+            .unwrap()
+            .into();
+            let ctx = Rc::new(ctx);
+            assert_eq!(
+                eval_out::<Vec<i64>>(&expr, ctx.clone()),
+                ctx.data_inputs
+                    .iter()
+                    .map(| b| b.get_box(&ctx.box_arena).unwrap().value() + 1)
+                    .collect::<Vec<i64>>()
+                //
+            );
+        }
+    }
+}
