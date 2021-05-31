@@ -22,6 +22,8 @@ use k256::{AffinePoint, ProjectivePoint, PublicKey, Scalar};
 use sigma_ser::vlq_encode;
 
 use elliptic_curve::weierstrass::public_key::FromPublicKey;
+#[cfg(feature = "json")]
+use serde;
 use std::{
     io,
     ops::{Add, Mul, Neg},
@@ -51,6 +53,27 @@ impl Neg for EcPoint {
 
     fn neg(self) -> EcPoint {
         EcPoint(ProjectivePoint::neg(self.0))
+    }
+}
+
+#[cfg(feature = "json")]
+impl<'de> serde::Deserialize<'de> for EcPoint {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+        Self::sigma_parse_bytes(&bytes).map_err(serde::de::Error::custom)
+    }
+}
+#[cfg(feature = "json")]
+impl serde::Serialize for EcPoint {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let bytes = self.sigma_serialize_bytes();
+        base16::encode_lower(&bytes).serialize(serializer)
     }
 }
 

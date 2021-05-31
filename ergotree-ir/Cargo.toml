@@ -30,9 +30,11 @@ base16 = "0.2.1"
 num-bigint = "0.4.0"
 # bounded-vec = { git = "https://github.com/ergoplatform/bounded-vec", rev="6726ac0" }
 bounded-vec = { version = "^0.2.0" }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
-default = []
+default = ["json"]
+json = ["serde"]
 arbitrary = ["proptest", "proptest-derive"]
 
 [dev-dependencies]
