@@ -38,6 +38,7 @@ mod tests {
 
     use crate::eval::context::Context;
     use crate::eval::tests::eval_out;
+    use crate::eval::tests::try_eval_out_wo_ctx;
 
     use super::*;
 
@@ -51,7 +52,7 @@ mod tests {
     use ergotree_ir::mir::property_call::PropertyCall;
     // use ergotree_ir::mir::val_use::ValUse;
     use ergotree_ir::types::scontext;
-    // use ergotree_ir::types::stype::SType;
+
     use proptest::prelude::*;
 
     proptest! {
@@ -59,25 +60,11 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(16))]
 
         #[test]
-        fn eval(ctx in any::<Context>()) {
-            let data_inputs: Expr = PropertyCall::new(Expr::Context, scontext::DATA_INPUTS_PROPERTY.clone()).unwrap()
-            .into();
-            let expr: Expr = Slice::new(
-                data_inputs,
-                1.into(),
-                3.into(),
-            )
-            .unwrap()
-            .into();
-            let ctx = Rc::new(ctx);
-            assert_eq!(
-                eval_out::<Vec<i64>>(&expr, ctx.clone()),
-                ctx.data_inputs
-                    .iter()
-                    .map(| b| b.get_box(&ctx.box_arena).unwrap().value() + 1)
-                    .collect::<Vec<i64>>()
-                //
-            );
+        fn eval(vec in any::<Vec<i32>>(), from_i in 0..10i32, until_i in 0..10i32) {
+            let expr: Expr = Slice::new(vec.clone().into(), from_i.into(), until_i.into())
+                .unwrap().into();
+            let res = try_eval_out_wo_ctx::<Vec<i32>>(&expr);
+            prop_assert_eq!(res, Ok(vec));
         }
     }
 }
