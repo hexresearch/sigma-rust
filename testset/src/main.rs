@@ -7,7 +7,6 @@ use ergotree_ir::mir::expr::Expr;
 use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
 use rusqlite;
-use sigma_ser::peekable_reader::PeekableReader;
 use sigma_ser::vlq_encode::{ReadSigmaVlqExt,WriteSigmaVlqExt};
 use std::io::{Cursor, Seek};
 use ergotree_ir::serialization::sigma_byte_writer::SigmaByteWriter;
@@ -17,9 +16,7 @@ use std::io;
 fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
     let mut buf = bytes.to_owned();
     let cursor = Cursor::new(&mut buf[..]);
-    let pr = PeekableReader::new(cursor);
-    let mut sr = SigmaByteReader::new(pr, ConstantStore::empty());
-    let r = &mut sr;
+    let mut r = SigmaByteReader::new(cursor, ConstantStore::empty());
 
     // Parse block
     let (n_tx, after_fork) = {
@@ -31,64 +28,29 @@ fn parse_block(bytes: &[u8]) -> Result<String, SerializationError> {
         }
     };
     let txs = {
-        let mut txs = Vec::with_capacity(n_tx as usize);
+        let mut txs : Vec<Transaction> = Vec::with_capacity(n_tx as usize);
         for i in 0..n_tx {
-            let tx = Transaction::sigma_parse(r)?;
-            let tx2 = Transaction::sigma_parse_bytes(tx.sigma_serialize_bytes())?;
-            //
-            let a = &tx.output_candidates[0].ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap();
-            let b = &tx2.output_candidates[0].ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap();
-            fn drill(e: &Expr) -> Option<Expr> {
-                match e {
-                    Expr::BlockValue(v) => Some(v.items[6].clone()),
-                    _ => None,
-                }
-            }
-            if a != b {
-                match(drill(a),drill(b)) {
-                    (Some(a), Some(b)) => {
-                        println!("{:?}",a);
-                        println!("");
-                        println!("{:?}",b);
-                        println!("{}",a==b);
-                    },
-                    (Some(a), None) => println!("A"),
-                    (None, Some(b)) => println!("B"),
-                    (None, None) => println!("NON"),
-                }
-                //     (Expr::BlockValue(v1), Expr::BlockValue(v2)) =>
-                //
-                // }
-                // println!("{:?}",a);
-            }
+            let tx = Transaction::sigma_parse(&mut r)?;
             txs.push(tx);
-            println!("N={}, off={:?}", i, r.inner.inner.seek(io::SeekFrom::Current(0)));
         }
         txs
     };
     // Write block back
-    let mut data = Vec::new();
-    let mut w = SigmaByteWriter::new(&mut data, None);
-    if after_fork {
-        w.put_u32(10000002)?;
-    }
-    w.put_u32(n_tx)?;
-    for tx in txs {
-        tx.sigma_serialize(&mut w)?;
-    }
+    let data = {
+        let mut data = Vec::new();
+        let mut w = SigmaByteWriter::new(&mut data, None);
+        if after_fork {
+            w.put_u32(10000002)?;
+        }
+        w.put_u32(n_tx)?;
+        for tx in txs {
+            tx.sigma_serialize(&mut w)?;
+        }
+        data
+    };
     if data != buf {
-        println!("N_tx = {}, N_b = {}->{}", n_tx, buf.len(), data.len());
-        buf.iter().zip(data).enumerate().for_each(|(i,(b1,b2))| {
-            if *b1 != b2 {
-                println!("{}: {} {}", i, b1, b2);
-            }
-        });
-        // zip()
-        // println!("{:?}", buf);
-        // println!("{:?}", data);
         Err(Misc("Roundtrip failed".into()))?
     }
-    //self.sigma_serialize(&mut w)?;
     Ok("AZAZA".to_string())
 }
 

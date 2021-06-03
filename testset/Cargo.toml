@@ -7,8 +7,8 @@ edition = "2018"
 description = "Poking into ErgoTree IR"
 
 [dependencies]
-ergotree-ir = { version = "^0.10.0", path = "../ergotree-ir" }
+ergotree-ir = { version = "^0.13.1", path = "../ergotree-ir" }
 sigma-ser = { version = "^0.2.0", path = "../sigma-ser" }
-ergo-lib = { version = "^0.10.0", path = "../ergo-lib" }
+ergo-lib = { version = "^0.13.1", path = "../ergo-lib" }
 rusqlite = "0.25.0"
 clap = "2.33.3"
