@@ -366,6 +366,21 @@ impl<T: Into<Value> + LiftIntoSType> From<T> for Expr {
     }
 }
 
+///
+pub trait ToBoxedExprExt {
+    ///
+    fn to_expr(self) -> Box<Expr>;
+}
+
+impl<T> ToBoxedExprExt for T where
+  Expr: From<T>
+{
+    fn to_expr(self) -> Box<Expr> {
+        Box::new(Expr::from(self))
+    }
+}
+
+
 /// Unexpected argument on node construction (i.e non-Option input in OptionGet)
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct InvalidArgumentError(pub String);
