@@ -192,8 +192,8 @@ pub enum ErgoTreeParsingError {
  */
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ErgoTree {
-    header: ErgoTreeHeader,
-    tree: Result<ParsedTree, ErgoTreeConstantsParsingError>,
+    pub header: ErgoTreeHeader,
+    pub tree: Result<ParsedTree, ErgoTreeConstantsParsingError>,
 }
 
 impl ErgoTree {
