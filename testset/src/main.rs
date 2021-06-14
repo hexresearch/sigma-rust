@@ -623,19 +623,13 @@ fn main() {
                 .takes_value(true),
         )
         .get_matches();
-    match matches.value_of("height") {
-        Some(h) => with_db(|conn| query_height(conn, h.parse().unwrap(), run_block_scan)).unwrap(),
-        None => match matches.value_of("h-lt") {
-            Some(h) => {
-                with_db(|conn| query_height_lt(conn, h.parse().unwrap(), run_block_scan)).unwrap()
-            }
-            None => match matches.value_of("h-gt") {
-                Some(h) => {
-                    with_db(|conn| query_height_gt(conn, h.parse().unwrap(), run_block_scan))
-                        .unwrap()
-                }
-                None => with_db(|conn| query_plain(conn, run_block_scan)).unwrap(),
-            },
-        },
+    if let Some(h) = matches.value_of("height") {
+        with_db(|conn| query_height(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+    } else if let Some(h) = matches.value_of("h-lt") {
+        with_db(|conn| query_height_lt(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+    } else if let Some(h) = matches.value_of("h-gt") {
+        with_db(|conn| query_height_gt(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+    } else {
+        with_db(|conn| query_plain(conn, run_block_scan)).unwrap();
     }
 }
