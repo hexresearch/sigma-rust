@@ -1,10 +1,14 @@
 #![feature(box_patterns)]
 
+mod prettyprinter;
+
 use ergotree_ir::mir::expr::{Expr, ToBoxedExprExt};
 use ergotree_ir::serialization::constant_store::ConstantStore;
 use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::SerializationError;
 use ergotree_ir::serialization::SigmaSerializable;
+use pretty;
+use prettyprinter::Pretty;
 
 use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
@@ -36,14 +40,15 @@ use sigma_ser::vlq_encode::ReadSigmaVlqExt;
 // use sigma_ser::vlq_encode::WriteSigmaVlqExt;
 use std::collections::BTreeMap;
 // use std::io;
+use ergo_lib::chain::{blake2b256_hash, Digest32};
 use ergotree_ir::mir::coll_by_index::ByIndex;
 use ergotree_ir::mir::create_prove_dh_tuple::CreateProveDhTuple;
 use ergotree_ir::mir::create_provedlog::CreateProveDlog;
 use ergotree_ir::mir::decode_point::DecodePoint;
 use ergotree_ir::mir::extract_script_bytes::ExtractScriptBytes;
 use ergotree_ir::mir::subst_const::SubstConstants;
+use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
-use std::convert::TryInto;
 
 // ---------------------------------------------------------------
 
@@ -265,7 +270,7 @@ fn is_54b_a(e: &Expr) -> Option<()> {
 
 fn is_54b_script(e: &Expr) -> Option<()> {
     match e {
-        Expr::SigmaAnd(SigmaAnd { items }) =>
+        Expr::SigmaAnd(SigmaAnd { items }) => {
             if items.len() == 2 {
                 let a = &items.as_vec()[0];
                 let b = &items.as_vec()[1];
@@ -273,7 +278,8 @@ fn is_54b_script(e: &Expr) -> Option<()> {
                 match_const_placeholder(b, 1, &SType::SSigmaProp)
             } else {
                 None
-            },
+            }
+        }
         _ => None,
     }
 }
@@ -390,13 +396,12 @@ fn is_198b_script(e: &Expr) -> Option<()> {
         }
         {
             let rb = rb.match_bool_to_sigma()?;
-            let (rb1,rb2) = match_binop(rb,RelationOp::Or.into())?;
-            let (rb11,rb12) = match_binop(rb1, RelationOp::Or.into())?;
-            let (rb111,rb112) = match_binop(rb11, RelationOp::And.into())?;
+            let (rb1, rb2) = match_binop(rb, RelationOp::Or.into())?;
+            let (rb11, rb12) = match_binop(rb1, RelationOp::Or.into())?;
+            let (rb111, rb112) = match_binop(rb11, RelationOp::And.into())?;
             dbg!(rb111);
             dbg!(rb112);
         }
-
     }
     //
     todo!()
@@ -409,6 +414,8 @@ struct NTx {
     pub n54: u32,
     pub n105: u32,
     pub n198: u32,
+    pub n415: u32,
+    pub n450: u32,
 }
 impl NTx {
     fn new() -> NTx {
@@ -417,11 +424,16 @@ impl NTx {
             n54: 0,
             n105: 0,
             n198: 0,
+            n415: 0,
+            n450: 0,
         }
     }
 
     fn tot(&self) -> usize {
-        (self.n36 + self.n54 + self.n105 + self.n198) as usize
+        (
+            self.n36 + self.n54 + self.n105 + self.n198 + self.n415 +
+            self.n450
+        ) as usize
     }
 
     fn dbg(&self, tot: usize) {
@@ -433,6 +445,8 @@ impl NTx {
         print(("B54 ", self.n54));
         print(("B105", self.n105));
         print(("B198", self.n198));
+        print(("B415", self.n415));
+        print(("B450", self.n450));
         println!("Classified = {:.2}%", (self.tot() as f64) / tot * 100.0);
     }
 }
@@ -463,6 +477,18 @@ fn parse_block(
         }
         txs
     };
+
+    let hash_b198 = Digest32::try_from(
+        "441438d8b1a847e8cc6f8c19e43e6c63e516cf1e1db45f246c1b6e84f70e685f".to_string(),
+    )
+    .unwrap();
+    let hash_b450 = Digest32::try_from(
+        "25b9da55e8c2ef009c0196aa2caa1b9bba2755a9f2627b4d64c2928aad6e63af".to_string(),
+    )
+    .unwrap();
+    let hash_b415 = Digest32::try_from(
+        "f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73".to_string()).unwrap();
+
     for tx in txs.iter().skip(1) {
         for out in &tx.output_candidates {
             let expr = &**(out.ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap());
@@ -473,8 +499,25 @@ fn parse_block(
                 ntx.n54 += 1;
             } else if is_105b_script(&expr).is_some() {
                 ntx.n105 += 1;
-            } else if n == 198 && is_198b_script(&expr).is_some() {
-                ntx.n198 += 1;
+            } else if n == 198 {
+                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
+                if h == hash_b198 {
+                    ntx.n198 += 1;
+                }
+            } else if n == 415 {
+                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
+                if h == hash_b415 {
+                    ntx.n415 += 1;
+                }
+            } else if n == 450 {
+                // let mut w = Vec::new();
+                // expr.pretty().render(80, &mut w).unwrap();
+                // println!("{}", String::from_utf8(w).unwrap());
+                //
+                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
+                if h == hash_b450 {
+                    ntx.n450 += 1;
+                }
             } else {
                 // if n == 54 {
                 //     dbg!(is_54b_script(&expr));

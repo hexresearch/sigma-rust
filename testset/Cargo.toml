@@ -13,3 +13,4 @@ ergo-lib = { version = "^0.13.1", path = "../ergo-lib" }
 rusqlite = "0.25.0"
 clap = "2.33.3"
 pretty = "0.10.0"
+base16 = "0.2.1"
