@@ -41,9 +41,9 @@ impl SigmaSerializable for FuncArg {
 /// User-defined function
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct FuncValue {
-    args: Vec<FuncArg>,
-    body: Box<Expr>,
-    tpe: SType,
+    pub args: Vec<FuncArg>,
+    pub body: Box<Expr>,
+    pub tpe: SType,
 }
 
 impl FuncValue {
