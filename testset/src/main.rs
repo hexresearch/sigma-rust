@@ -51,9 +51,9 @@ use ergotree_ir::mir::subst_const::SubstConstants;
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
-
-use testset::matcher::*;
+use rusqlite::ToSql;
 use testset::errors::SErr;
+use testset::matcher::*;
 
 // ---------------------------------------------------------------
 
@@ -65,7 +65,6 @@ use testset::errors::SErr;
 //         }
 //     }
 // }
-
 
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
@@ -259,10 +258,7 @@ impl NTx {
     }
 
     fn tot(&self) -> usize {
-        (
-            self.n36 + self.n54 + self.n105 + self.n198 + self.n415 +
-            self.n450
-        ) as usize
+        (self.n36 + self.n54 + self.n105 + self.n198 + self.n415 + self.n450) as usize
     }
 
     fn dbg(&self, tot: usize) {
@@ -316,7 +312,9 @@ fn parse_block(
     )
     .unwrap();
     let hash_b415 = Digest32::try_from(
-        "f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73".to_string()).unwrap();
+        "f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73".to_string(),
+    )
+    .unwrap();
 
     for tx in txs.iter().skip(1) {
         for out in &tx.output_candidates {
@@ -410,59 +408,76 @@ fn run_block_scan(blk_iter: rusqlite::Rows) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn query_plain<F, A>(conn: rusqlite::Connection, fun: F) -> rusqlite::Result<A>
-where
-    F: Fn(rusqlite::Rows) -> rusqlite::Result<A>,
-{
-    fun(conn
-        .prepare(
-            "SELECT height, txs FROM blocks \
+struct Query<'a> {
+    stmt: rusqlite::Statement<'a>,
+    param: Vec<Box<dyn rusqlite::ToSql>>,
+}
+
+impl<'a> Query<'a> {
+    pub fn newP(conn: &'a rusqlite::Connection, sql: &str) -> rusqlite::Result<Query<'a>> {
+        let stmt = conn.prepare(&sql)?;
+        Ok(Query {
+            stmt,
+            param: Vec::new(),
+        })
+    }
+
+    pub fn new(
+        conn: &'a rusqlite::Connection,
+        sql: &str,
+        param: Vec<Box<dyn rusqlite::ToSql>>,
+    ) -> rusqlite::Result<Query<'a>> {
+        let stmt = conn.prepare(&sql)?;
+        Ok(Query { stmt, param })
+    }
+
+    pub fn run(&mut self) -> rusqlite::Result<rusqlite::Rows> {
+        let params = self.param.iter().map(|x| &**x).collect::<Vec<_>>();
+        let params: &[&dyn ToSql] = params.as_ref();
+        self.stmt.query(params)
+    }
+}
+
+fn query_plain(conn: &rusqlite::Connection) -> rusqlite::Result<Query> {
+    Query::newP(
+        conn,
+        "SELECT height, txs FROM blocks \
                 WHERE txs IS NOT NULL \
                 ORDER BY height desc",
-        )?
-        .query([])?)
+    )
 }
 
-fn query_height<F, A>(conn: rusqlite::Connection, h: i32, fun: F) -> rusqlite::Result<A>
-where
-    F: Fn(rusqlite::Rows) -> rusqlite::Result<A>,
-{
-    fun(conn
-        .prepare(
-            "SELECT height, txs FROM blocks \
+fn query_height(conn: &rusqlite::Connection, h: i32) -> rusqlite::Result<Query> {
+    Query::new(
+        conn,
+        "SELECT height, txs FROM blocks \
                   WHERE txs IS NOT NULL AND height = ? \
                   ORDER BY height desc",
-        )?
-        .query(rusqlite::params![h])?)
+        vec![Box::new(h)],
+    )
 }
 
-fn query_height_lt<F, A>(conn: rusqlite::Connection, h: i32, fun: F) -> rusqlite::Result<A>
-where
-    F: Fn(rusqlite::Rows) -> rusqlite::Result<A>,
-{
-    fun(conn
-        .prepare(
-            "SELECT height, txs FROM blocks \
+fn query_height_lt(conn: &rusqlite::Connection, h: i32) -> rusqlite::Result<Query> {
+    Query::new(
+        conn,
+        "SELECT height, txs FROM blocks \
                   WHERE txs IS NOT NULL AND height < ? \
                   ORDER BY height desc",
-        )?
-        .query(rusqlite::params![h])?)
+        vec![Box::new(h)],
+    )
 }
 
-fn query_height_gt<F, A>(conn: rusqlite::Connection, h: i32, fun: F) -> rusqlite::Result<A>
-where
-    F: Fn(rusqlite::Rows) -> rusqlite::Result<A>,
-{
-    fun(conn
-        .prepare(
-            "SELECT height, txs FROM blocks \
+fn query_height_gt(conn: &rusqlite::Connection, h: i32) -> rusqlite::Result<Query> {
+    Query::new(
+        conn,
+        "SELECT height, txs FROM blocks \
                   WHERE txs IS NOT NULL AND height > ? \
                   ORDER BY height desc",
-        )?
-        .query(rusqlite::params![h])?)
+        vec![Box::new(h)],
+    )
 }
 
-fn main() -> Result<(),SErr>{
+fn main() -> Result<(), SErr> {
     let matches = App::new("Ergo parse")
         .arg(
             Arg::with_name("height")
@@ -487,15 +502,22 @@ fn main() -> Result<(),SErr>{
                 .takes_value(true),
         )
         .get_matches();
+    let mk_query: Box<Fn(&rusqlite::Connection) -> rusqlite::Result<Query>> =
+        if let Some(h) = matches.value_of("height") {
+            let h = h.parse().unwrap();
+            Box::new(move |conn| query_height(conn, h))
+        } else if let Some(h) = matches.value_of("h-lt") {
+            let h = h.parse().unwrap();
+            Box::new(move |conn| query_height_lt(conn, h))
+        } else if let Some(h) = matches.value_of("h-gt") {
+            let h = h.parse().unwrap();
+            Box::new(move |conn| query_height_gt(conn, h))
+        } else {
+            Box::new(|conn| query_plain(conn))
+        };
+    // Run program
     let conn = rusqlite::Connection::open("../ergvein/blocks.sqlite")?;
-    if let Some(h) = matches.value_of("height") {
-        query_height(conn, h.parse().unwrap(), run_block_scan)?;
-    } else if let Some(h) = matches.value_of("h-lt") {
-        query_height_lt(conn, h.parse().unwrap(), run_block_scan)?;
-    } else if let Some(h) = matches.value_of("h-gt") {
-        query_height_gt(conn, h.parse().unwrap(), run_block_scan)?;
-    } else {
-        query_plain(conn, run_block_scan)?;
-    }
+    let mut query = mk_query(&conn)?;
+    run_block_scan(query.run()?)?;
     Ok(())
 }
