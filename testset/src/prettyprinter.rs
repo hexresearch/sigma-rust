@@ -17,11 +17,13 @@ use ergotree_ir::mir::create_prove_dh_tuple::CreateProveDhTuple;
 use ergotree_ir::mir::create_provedlog::CreateProveDlog;
 use ergotree_ir::mir::decode_point::DecodePoint;
 use ergotree_ir::mir::expr::Expr;
+use ergotree_ir::mir::extract_amount::ExtractAmount;
 use ergotree_ir::mir::extract_creation_info::ExtractCreationInfo;
 use ergotree_ir::mir::extract_reg_as::ExtractRegisterAs;
 use ergotree_ir::mir::extract_script_bytes::ExtractScriptBytes;
 use ergotree_ir::mir::func_value::{FuncArg, FuncValue};
 use ergotree_ir::mir::global_vars::GlobalVars;
+use ergotree_ir::mir::if_op::If;
 use ergotree_ir::mir::option_get::OptionGet;
 use ergotree_ir::mir::or::Or;
 use ergotree_ir::mir::property_call::PropertyCall;
@@ -39,9 +41,6 @@ use ergotree_ir::sigma_protocol::sigma_boolean::{
 use ergotree_ir::types::sfunc::SFunc;
 use ergotree_ir::types::smethod::SMethod;
 use ergotree_ir::types::stype::SType;
-use std::collections::hash_map::RandomState;
-use ergotree_ir::mir::extract_amount::ExtractAmount;
-use ergotree_ir::mir::if_op::If;
 
 pub trait Pretty {
     fn pretty(&self) -> pretty::RcDoc;
@@ -245,9 +244,11 @@ impl Pretty for PropertyCall {
 
 impl Pretty for If {
     fn pretty(&self) -> pretty::RcDoc {
-        ternary("IF", self.condition.pretty(),
-        self.true_branch.pretty(),
-            self.false_branch.pretty()
+        ternary(
+            "IF",
+            self.condition.pretty(),
+            self.true_branch.pretty(),
+            self.false_branch.pretty(),
         )
     }
 }

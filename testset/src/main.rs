@@ -1,53 +1,33 @@
 #![feature(box_patterns)]
-
+#![allow(non_camel_case_types)]
 mod prettyprinter;
 mod testset;
 
-use ergotree_ir::mir::expr::{Expr, ToBoxedExprExt};
+use ergotree_ir::mir::expr::Expr;
 use ergotree_ir::serialization::constant_store::ConstantStore;
 use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::SerializationError;
 use ergotree_ir::serialization::SigmaSerializable;
-use pretty;
 use prettyprinter::Pretty;
 
 use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
-use ergo_lib::ergotree_ir::mir::constant::ConstantPlaceholder;
-use ergotree_ir::mir::and::And;
-use ergotree_ir::mir::bin_op::{ArithOp, BinOp, BinOpKind, RelationOp};
-use ergotree_ir::mir::block::BlockValue;
-use ergotree_ir::mir::bool_to_sigma::BoolToSigmaProp;
-use ergotree_ir::mir::coll_size::SizeOf;
-use ergotree_ir::mir::collection::Collection;
-use ergotree_ir::mir::constant::Constant;
+use ergotree_ir::mir::bin_op::{ArithOp, BinOpKind, RelationOp};
 use ergotree_ir::mir::extract_creation_info::ExtractCreationInfo;
-use ergotree_ir::mir::extract_reg_as::ExtractRegisterAs;
 use ergotree_ir::mir::global_vars::GlobalVars;
-use ergotree_ir::mir::option_get::OptionGet;
-use ergotree_ir::mir::select_field::{SelectField, TupleFieldIndex};
+use ergotree_ir::mir::select_field::{SelectField};
 use ergotree_ir::mir::sigma_and::SigmaAnd;
-use ergotree_ir::mir::sigma_or::SigmaOr;
-use ergotree_ir::mir::val_def::ValId;
-use ergotree_ir::mir::val_use::ValUse;
-use ergotree_ir::mir::value::Value;
-// use ergotree_ir::serialization::sigma_byte_writer::SigmaByteWriter;
-// use ergotree_ir::serialization::SerializationError::Misc;
+use ergotree_ir::serialization::sigma_byte_writer::SigmaByteWriter;
 use ergotree_ir::sigma_protocol::sigma_boolean::SigmaBoolean;
-use ergotree_ir::sigma_protocol::sigma_boolean::{ProveDlog, SigmaProofOfKnowledgeTree, SigmaProp};
+use ergotree_ir::sigma_protocol::sigma_boolean::{ProveDlog, SigmaProofOfKnowledgeTree};
 use ergotree_ir::types::stype::SType;
 use rusqlite;
 use sigma_ser::vlq_encode::ReadSigmaVlqExt;
-// use sigma_ser::vlq_encode::WriteSigmaVlqExt;
+use sigma_ser::vlq_encode::WriteSigmaVlqExt;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 // use std::io;
 use ergo_lib::chain::{blake2b256_hash, Digest32};
-use ergotree_ir::mir::coll_by_index::ByIndex;
-use ergotree_ir::mir::create_prove_dh_tuple::CreateProveDhTuple;
-use ergotree_ir::mir::create_provedlog::CreateProveDlog;
-use ergotree_ir::mir::decode_point::DecodePoint;
-use ergotree_ir::mir::extract_script_bytes::ExtractScriptBytes;
-use ergotree_ir::mir::subst_const::SubstConstants;
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
@@ -112,301 +92,208 @@ fn is_54b_script(e: &Expr) -> Option<()> {
     }
 }
 
-fn is_105b_script(e: &Expr) -> Option<()> {
-    let e = e
-        .match_bool_to_sigma()?
-        .match_and()?
-        .match_collection(&SType::SBoolean)?;
-    let (a, b, c) = match_vec3(e)?;
-    // A
-    {
-        let (a_1, a_2) = match_binop(a, BinOpKind::Relation(RelationOp::Eq))?;
-        expect(a_1, &GlobalVars::Height.into())?;
-        let a_2 = a_2.match_select_field(1)?.match_extract_creation_info()?;
-        expect(
-            a_2,
-            &ByIndex {
-                input: GlobalVars::Outputs.to_expr(),
-                index: ConstantPlaceholder {
-                    id: 0,
-                    tpe: SType::SInt,
-                }
-                .to_expr(),
-                default: None,
-            }
-            .into(),
-        )?;
-    }
-    // B
-    {
-        let (b_1, b_2) = match_binop(b, RelationOp::Eq.into())?;
-        expect(
-            b_1,
-            &ExtractScriptBytes {
-                input: ByIndex {
-                    input: GlobalVars::Outputs.to_expr(),
-                    index: ConstantPlaceholder {
-                        id: 1,
-                        tpe: SType::SInt,
-                    }
-                    .to_expr(),
-                    default: None,
-                }
-                .to_expr(),
-            }
-            .to_expr(),
-        )?;
-        expect(
-            b_2,
-            &SubstConstants {
-                script_bytes: ConstantPlaceholder {
-                    id: 2,
-                    tpe: SType::SColl(SType::SByte.into()),
-                }
-                .to_expr(),
-                positions: ConstantPlaceholder {
-                    id: 3,
-                    tpe: SType::SColl(SType::SInt.into()),
-                }
-                .to_expr(),
-                new_values: Collection::Exprs {
-                    elem_tpe: SType::SSigmaProp,
-                    items: vec![CreateProveDlog {
-                        input: DecodePoint {
-                            input: GlobalVars::MinerPubKey.to_expr(),
-                        }
-                        .to_expr(),
-                    }
-                    .into()],
-                }
-                .to_expr(),
-            }
-            .to_expr(),
-        )?;
-    }
-    // C
-    {
-        let (c_1, c_2) = match_binop(c, BinOpKind::Relation(RelationOp::Eq))?;
-        expect(
-            c_1,
-            &SizeOf {
-                input: Box::new(GlobalVars::Outputs.into()),
-            }
-            .into(),
-        )?;
-        match_const_placeholder(c_2, 4, &SType::SInt)?;
-    }
-    Some(())
+// --------------------------------------------------------------------------------
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum TxType {
+    TxP2PK_36,
+    TxP2PK_54,
+    Tx105,
+    Tx198,
+    Tx228,
+    Tx415,
+    Tx450,
 }
 
-fn is_198b_script(e: &Expr) -> Option<()> {
-    let (vals, res) = match_block_value(e)?;
-    dbg!(vals.len());
-    // Parse result
-    {
-        let res = res.match_sigma_and()?;
-        let (ra, rb) = match_vec2(res)?;
-        {
-            let ra = ra.match_sigma_or()?;
-            let (ra1, ra2) = match_vec2(ra)?;
-            let () = ra1.match_dlog()?.match_valuse(1, SType::SGroupElement)?;
-            let (gv, hv, vv, uv) = ra2.match_dhtuple()?;
-            let () = hv
-                .match_option_get()?
-                .match_extract_register(4, SType::SGroupElement)?
-                .match_global_var(GlobalVars::SelfBox)?;
-            let () = vv.match_valuse(1, SType::SGroupElement)?;
-            let () = uv
-                .match_option_get()?
-                .match_extract_register(6, SType::SGroupElement)?
-                .match_global_var(GlobalVars::SelfBox)?;
-            // dbg!(gv);
+struct Classifier {
+    pub named: HashMap<TxType, u32>,
+    pub sized: BTreeMap<usize, u32>,
+    hash_b105: Digest32,
+    hash_b198: Digest32,
+    hash_b228: Digest32,
+    hash_b415: Digest32,
+    hash_b450: Digest32,
+}
+
+impl Classifier {
+    fn new() -> Classifier {
+        fn mk(s: &str) -> Digest32 {
+            Digest32::try_from(s.to_string()).unwrap()
         }
-        {
-            let rb = rb.match_bool_to_sigma()?;
-            let (rb1, rb2) = match_binop(rb, RelationOp::Or.into())?;
-            let (rb11, rb12) = match_binop(rb1, RelationOp::Or.into())?;
-            let (rb111, rb112) = match_binop(rb11, RelationOp::And.into())?;
-            dbg!(rb111);
-            dbg!(rb112);
+        let hash_b105 = mk("922e50aa537eacdad7f0584dd703426d8f376d7623422afc3b212bd2f674e2b2");
+        let hash_b198 = mk("441438d8b1a847e8cc6f8c19e43e6c63e516cf1e1db45f246c1b6e84f70e685f");
+        let hash_b228 = mk("ac08c57ae9c761ffd023cf64d666228ca15f2e46f9b74171a445efa50b65d58c");
+        let hash_b450 = mk("25b9da55e8c2ef009c0196aa2caa1b9bba2755a9f2627b4d64c2928aad6e63af");
+        let hash_b415 = mk("f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73");
+        Classifier {
+            named: HashMap::<TxType, u32>::new(),
+            sized: BTreeMap::new(),
+            hash_b105,
+            hash_b198,
+            hash_b228,
+            hash_b415,
+            hash_b450,
         }
     }
-    //
-    todo!()
+
+    fn bump_named(&mut self, k: TxType) {
+        (*self.named.entry(k).or_insert(0)) += 1;
+    }
 }
+impl Check for Classifier {
+    fn name(&self) -> &'static str {
+        "Classifier"
+    }
+
+    fn check(&mut self, tx: &TxData) {
+        for tx in tx.block.iter().flatten() {
+            for out in &tx.output_candidates {
+                // FIXME: Extremely ugly and dangerous
+                let expr = &**(out.ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap());
+                // Here we compute size of full ergo tree but test for equality only script itself
+                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
+                let n = out.ergo_tree.sigma_serialize_bytes().len();
+
+
+                if is_36b_script(&expr).is_some() {
+                    self.bump_named(TxType::TxP2PK_36);
+                } else if is_54b_script(&expr).is_some() {
+                    self.bump_named(TxType::TxP2PK_54);
+                } else if n == 105 && h == self.hash_b105 {
+                    self.bump_named(TxType::Tx105);
+                } else if n == 198 && h == self.hash_b198 {
+                    self.bump_named(TxType::Tx198);
+                } else if n == 228 && h == self.hash_b228 {
+                    self.bump_named(TxType::Tx228);
+                } else if n == 415 && h == self.hash_b415 {
+                    self.bump_named(TxType::Tx415);
+                } else if n == 450 && h == self.hash_b450 {
+                    self.bump_named(TxType::Tx450);
+                } else {
+                    *(self.sized.entry(n).or_insert(0)) += 1;
+                }
+            }
+        }
+    }
+
+    fn finalize(&self) {
+        let tot: u32 = self.named.iter().map(|(_, n)| *n).sum::<u32>()
+            + self.sized.iter().map(|(_, n)| *n).sum::<u32>();
+        println!("TOT = {}", tot);
+        // Named
+        {
+            let mut named = self.named.iter().collect::<Vec<_>>();
+            named.sort_by_key(|(k, _)| *k);
+            for (nm, n) in named {
+                let f: f64 = (*n as f64) / (tot as f64);
+                println!("{:?} {:6} ({:.2}%)", nm, n, f * 100.0);
+            }
+        }
+        // Sized
+        {
+            let mut sized = self.sized.iter().collect::<Vec<_>>();
+            sized.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
+            for (sz, n) in sized.iter() {
+                let f: f64 = (**n as f64) / (tot as f64);
+                if f > 1e-2 {
+                    println!("{:4} {:6} ({:.2}%)", sz, n, f * 100.0);
+                }
+            }
+        }
+    }
+}
+
+
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
-struct NTx {
-    pub n36: u32,
-    pub n54: u32,
-    pub n105: u32,
-    pub n198: u32,
-    pub n415: u32,
-    pub n450: u32,
+trait Check {
+    fn name(&self) -> &'static str;
+    fn check(&mut self, tx: &TxData);
+    fn finalize(&self) {}
 }
-impl NTx {
-    fn new() -> NTx {
-        NTx {
-            n36: 0,
-            n54: 0,
-            n105: 0,
-            n198: 0,
-            n415: 0,
-            n450: 0,
+
+// --------------------------------------------------------------------------------
+
+/// Transactions correctly roundtrips
+struct Roundtrip;
+
+impl Check for Roundtrip {
+    fn name(&self) -> &'static str {
+        "Roundtrip"
+    }
+    fn check(&mut self, tx: &TxData) {
+        if let Ok(txs) = &tx.block {
+            let mut data = Vec::new();
+            let mut w = SigmaByteWriter::new(&mut data, None);
+            if tx.after_fork {
+                w.put_u32(10000002).unwrap();
+            }
+            w.put_u32(txs.len() as u32).unwrap();
+            for tx in txs {
+                tx.sigma_serialize(&mut w).unwrap();
+            }
+            if data != tx.binary {
+                println!("H={} Roundtrip failed", tx.h);
+            }
         }
     }
+}
 
-    fn tot(&self) -> usize {
-        (self.n36 + self.n54 + self.n105 + self.n198 + self.n415 + self.n450) as usize
-    }
+// --------------------------------------------------------------------------------
 
-    fn dbg(&self, tot: usize) {
-        let tot = tot as f64;
-        let print = |(s, n): (&str, u32)| {
-            println!("{} = {} / {:.2}%", s, n, (n as f64) / tot * 100.0);
+/// Transactions data
+struct TxData {
+    pub h: u32,
+    pub binary: Vec<u8>,
+    pub block: Result<Vec<Transaction>, SerializationError>,
+    pub after_fork: bool,
+}
+
+impl TxData {
+    /// Create new TX data object
+    pub fn new(h: u32, binary: Vec<u8>) -> TxData {
+        let res = Self::parse_block(&binary);
+        let after_fork = match &res {
+            Ok((a, _)) => *a,
+            Err(_) => false,
         };
-        print(("B36 ", self.n36));
-        print(("B54 ", self.n54));
-        print(("B105", self.n105));
-        print(("B198", self.n198));
-        print(("B415", self.n415));
-        print(("B450", self.n450));
-        println!("Classified = {:.2}%", (self.tot() as f64) / tot * 100.0);
-    }
-}
-
-fn parse_block(
-    bytes: &[u8],
-    hist: &mut BTreeMap<usize, usize>,
-    ntx: &mut NTx,
-) -> Result<String, SerializationError> {
-    let mut buf = bytes.to_owned();
-    let cursor = Cursor::new(&mut buf[..]);
-    let mut r = SigmaByteReader::new(cursor, ConstantStore::empty());
-
-    // Parse block
-    let (n_tx, after_fork) = {
-        let n = r.get_u32()?;
-        if n == 10000002 {
-            (r.get_u32()?, true)
-        } else {
-            (n, false)
+        let block = res.map(|(_, b)| b);
+        TxData {
+            h,
+            binary,
+            block,
+            after_fork,
         }
-    };
-    let txs = {
+    }
+
+    /// Test that we parsed thing correctly
+    pub fn check_parse(&self) -> () {
+        if let Err(e) = &self.block {
+            println!("H={} : {:?}", self.h, e);
+        }
+    }
+
+    fn parse_block(binary: &Vec<u8>) -> Result<(bool, Vec<Transaction>), SerializationError> {
+        let cursor = Cursor::new(&binary);
+        let mut r = SigmaByteReader::new(cursor, ConstantStore::empty());
+        // Parse number of transactions
+        let (n_tx, after_fork) = {
+            let n = r.get_u32()?;
+            if n == 10000002 {
+                (r.get_u32()?, true)
+            } else {
+                (n, false)
+            }
+        };
+        //
         let mut txs: Vec<Transaction> = Vec::with_capacity(n_tx as usize);
         for _ in 0..n_tx {
             let tx = Transaction::sigma_parse(&mut r)?;
             txs.push(tx);
         }
-        txs
-    };
-
-    let hash_b198 = Digest32::try_from(
-        "441438d8b1a847e8cc6f8c19e43e6c63e516cf1e1db45f246c1b6e84f70e685f".to_string(),
-    )
-    .unwrap();
-    let hash_b450 = Digest32::try_from(
-        "25b9da55e8c2ef009c0196aa2caa1b9bba2755a9f2627b4d64c2928aad6e63af".to_string(),
-    )
-    .unwrap();
-    let hash_b415 = Digest32::try_from(
-        "f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73".to_string(),
-    )
-    .unwrap();
-
-    for tx in txs.iter().skip(1) {
-        for out in &tx.output_candidates {
-            let expr = &**(out.ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap());
-            let n = out.ergo_tree.sigma_serialize_bytes().len();
-            if is_36b_script(&expr).is_some() {
-                ntx.n36 += 1;
-            } else if is_54b_script(&expr).is_some() {
-                ntx.n54 += 1;
-            } else if is_105b_script(&expr).is_some() {
-                ntx.n105 += 1;
-            } else if n == 198 {
-                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
-                if h == hash_b198 {
-                    ntx.n198 += 1;
-                }
-            } else if n == 415 {
-                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
-                if h == hash_b415 {
-                    ntx.n415 += 1;
-                }
-            } else if n == 450 {
-                // let mut w = Vec::new();
-                // expr.pretty().render(80, &mut w).unwrap();
-                // println!("{}", String::from_utf8(w).unwrap());
-                //
-                let h = blake2b256_hash(&expr.sigma_serialize_bytes());
-                if h == hash_b450 {
-                    ntx.n450 += 1;
-                }
-            } else {
-                // if n == 54 {
-                //     dbg!(is_54b_script(&expr));
-                //     println!("{:#?}", &expr);
-                // }
-                *(hist.entry(n).or_insert(0)) += 1;
-            }
-            // if n == 36 {
-            //
-            // }
-        }
+        Ok((after_fork, txs))
     }
-    /*
-       // Write block back
-       let data = {
-           let mut data = Vec::new();
-           let mut w = SigmaByteWriter::new(&mut data, None);
-           if after_fork {
-               w.put_u32(10000002)?;
-           }
-           w.put_u32(n_tx)?;
-           for tx in txs {
-               tx.sigma_serialize(&mut w)?;
-           }
-           data
-       };
-       if data != buf {
-           Err(Misc("Roundtrip failed".into()))?
-       }
-    */
-    Ok("AZAZA".to_string())
 }
 
-fn run_block_scan(blk_iter: rusqlite::Rows) -> rusqlite::Result<()> {
-    let blk_iter =
-        blk_iter.mapped(|row| Ok((row.get::<usize, u32>(0)?, row.get::<usize, Vec<u8>>(1)?)));
-    let mut hist = BTreeMap::new();
-    let mut ntx = NTx::new();
-    for row in blk_iter {
-        let (h, blk) = row?;
-        // println!("H={}", h);
-        // parse_block(&blk).unwrap();
-        match parse_block(&blk, &mut hist, &mut ntx) {
-            Ok(_) => (),
-            Err(e) => println!("H={} : {:?}", h, &e),
-        };
-    }
-    // Sort in reverse popularity
-    let mut freq = hist.iter().collect::<Vec<_>>();
-    freq.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
-    // Compute total
-    let tot: usize = freq.iter().map(|(_, n)| *n).sum::<usize>() + ntx.tot();
-    println!("TOT = {}", tot);
-    ntx.dbg(tot);
-    for (sz, n) in freq.iter() {
-        let f: f64 = (**n as f64) / (tot as f64);
-        if f > 1e-2 {
-            println!("{:4} {} ({:.2})", sz, n, f * 100.0);
-        }
-    }
-    Ok(())
-}
 
 struct Query<'a> {
     stmt: rusqlite::Statement<'a>,
@@ -414,7 +301,7 @@ struct Query<'a> {
 }
 
 impl<'a> Query<'a> {
-    pub fn newP(conn: &'a rusqlite::Connection, sql: &str) -> rusqlite::Result<Query<'a>> {
+    pub fn new_p(conn: &'a rusqlite::Connection, sql: &str) -> rusqlite::Result<Query<'a>> {
         let stmt = conn.prepare(&sql)?;
         Ok(Query {
             stmt,
@@ -439,7 +326,7 @@ impl<'a> Query<'a> {
 }
 
 fn query_plain(conn: &rusqlite::Connection) -> rusqlite::Result<Query> {
-    Query::newP(
+    Query::new_p(
         conn,
         "SELECT height, txs FROM blocks \
                 WHERE txs IS NOT NULL \
@@ -501,8 +388,27 @@ fn main() -> Result<(), SErr> {
                 .help("Read only block with height greater than given")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("roundtrip")
+                .long("roundtrip")
+                .help("Check that TX encoding roudntrips"),
+        )
+        .arg(
+            Arg::with_name("classify")
+                .long("classify")
+                .help("Check that TX encoding roudntrips"),
+        )
         .get_matches();
-    let mk_query: Box<Fn(&rusqlite::Connection) -> rusqlite::Result<Query>> =
+    // Feature flags
+    let mut checks: Vec<Box<dyn Check>> = Vec::new();
+    if matches.is_present("roundtrip") {
+        checks.push(Box::new(Roundtrip));
+    }
+    if matches.is_present("classify") {
+        checks.push(Box::new(Classifier::new()));
+    }
+    // How to query database
+    let mk_query: Box<dyn Fn(&rusqlite::Connection) -> rusqlite::Result<Query>> =
         if let Some(h) = matches.value_of("height") {
             let h = h.parse().unwrap();
             Box::new(move |conn| query_height(conn, h))
@@ -515,9 +421,27 @@ fn main() -> Result<(), SErr> {
         } else {
             Box::new(|conn| query_plain(conn))
         };
+    // Announces
+    for c in &checks {
+        println!("- Checking {}", c.name());
+    }
     // Run program
     let conn = rusqlite::Connection::open("../ergvein/blocks.sqlite")?;
     let mut query = mk_query(&conn)?;
-    run_block_scan(query.run()?)?;
+    let rows = query
+        .run()?
+        .mapped(|row| Ok((row.get::<usize, u32>(0)?, row.get::<usize, Vec<u8>>(1)?)));
+    for row in rows {
+        let (h, bs) = row?;
+        let tx_data = TxData::new(h, bs);
+        // Start checking stuff
+        tx_data.check_parse();
+        for c in &mut checks {
+            c.check(&tx_data);
+        }
+    }
+    for c in &checks {
+        c.finalize();
+    }
     Ok(())
 }

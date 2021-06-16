@@ -1,13 +1,12 @@
-use std::convert::{TryFrom, TryInto};
-use ergo_lib::chain::transaction::Transaction;
-use ergotree_ir::mir::expr::{Expr, ToBoxedExprExt};
 use ergotree_ir::mir::and::And;
-use ergotree_ir::mir::bin_op::{ArithOp, BinOp, BinOpKind, RelationOp};
+use ergotree_ir::mir::bin_op::{BinOp, BinOpKind};
 use ergotree_ir::mir::block::BlockValue;
 use ergotree_ir::mir::bool_to_sigma::BoolToSigmaProp;
-use ergotree_ir::mir::coll_size::SizeOf;
 use ergotree_ir::mir::collection::Collection;
-use ergotree_ir::mir::constant::{Constant,ConstantPlaceholder};
+use ergotree_ir::mir::constant::{Constant, ConstantPlaceholder};
+use ergotree_ir::mir::create_prove_dh_tuple::CreateProveDhTuple;
+use ergotree_ir::mir::create_provedlog::CreateProveDlog;
+use ergotree_ir::mir::expr::{Expr};
 use ergotree_ir::mir::extract_creation_info::ExtractCreationInfo;
 use ergotree_ir::mir::extract_reg_as::ExtractRegisterAs;
 use ergotree_ir::mir::global_vars::GlobalVars;
@@ -18,14 +17,9 @@ use ergotree_ir::mir::sigma_or::SigmaOr;
 use ergotree_ir::mir::val_def::ValId;
 use ergotree_ir::mir::val_use::ValUse;
 use ergotree_ir::mir::value::Value;
-use ergotree_ir::mir::coll_by_index::ByIndex;
-use ergotree_ir::mir::create_prove_dh_tuple::CreateProveDhTuple;
-use ergotree_ir::mir::create_provedlog::CreateProveDlog;
-use ergotree_ir::mir::decode_point::DecodePoint;
-use ergotree_ir::mir::extract_script_bytes::ExtractScriptBytes;
-use ergotree_ir::mir::subst_const::SubstConstants;
-use ergotree_ir::types::stype::SType;
 use ergotree_ir::sigma_protocol::sigma_boolean::SigmaBoolean;
+use ergotree_ir::types::stype::SType;
+use std::convert::TryInto;
 
 pub trait Deconstruct: Sized {
     fn match_and(self) -> Option<Self>;
@@ -78,9 +72,9 @@ impl Deconstruct for &Expr {
         let idx: TupleFieldIndex = idx.try_into().unwrap();
         match self {
             Expr::SelectField(SelectField {
-                                  input: box expr,
-                                  field_index: i,
-                              }) if i == &idx => Some(expr),
+                input: box expr,
+                field_index: i,
+            }) if i == &idx => Some(expr),
             _ => None,
         }
     }
@@ -115,11 +109,11 @@ impl Deconstruct for &Expr {
     fn match_dhtuple(self) -> Option<(Self, Self, Self, Self)> {
         match self {
             Expr::CreateProveDhTuple(CreateProveDhTuple {
-                                         box gv,
-                                         box hv,
-                                         box uv,
-                                         box vv,
-                                     }) => Some((gv, hv, vv, uv)),
+                box gv,
+                box hv,
+                box uv,
+                box vv,
+            }) => Some((gv, hv, vv, uv)),
             _ => None,
         }
     }
@@ -127,10 +121,10 @@ impl Deconstruct for &Expr {
     fn match_extract_register(self, id: i8, ty: SType) -> Option<Self> {
         match self {
             Expr::ExtractRegisterAs(ExtractRegisterAs {
-                                        box input,
-                                        register_id,
-                                        elem_tpe,
-                                    }) if register_id == &id && elem_tpe == &ty => Some(input),
+                box input,
+                register_id,
+                elem_tpe,
+            }) if register_id == &id && elem_tpe == &ty => Some(input),
             _ => None,
         }
     }
@@ -179,10 +173,10 @@ pub fn match_block_value(e: &Expr) -> Option<(Vec<&Expr>, &Expr)> {
 pub fn match_binop(e: &Expr, op: BinOpKind) -> Option<(&Expr, &Expr)> {
     match e {
         Expr::BinOp(BinOp {
-                        kind,
-                        left: box a,
-                        right: box b,
-                    }) if kind == &op => Some((a, b)),
+            kind,
+            left: box a,
+            right: box b,
+        }) if kind == &op => Some((a, b)),
         _ => None,
     }
 }

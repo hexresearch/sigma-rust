@@ -9,5 +9,5 @@ pub enum SErr {
     IO(#[from] io::Error),
     /// SQLite error
     #[error("SQLite error: {0}")]
-    SQLite(#[from] rusqlite::Error)
+    SQLite(#[from] rusqlite::Error),
 }
