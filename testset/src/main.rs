@@ -51,123 +51,11 @@ use ergotree_ir::mir::subst_const::SubstConstants;
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
+
+use testset::matcher::*;
+
 // ---------------------------------------------------------------
 
-trait Deconstruct: Sized {
-    fn match_and(self) -> Option<Self>;
-    fn match_sigma_and(self) -> Option<Vec<Self>>;
-    fn match_sigma_or(self) -> Option<Vec<Self>>;
-    fn match_option_get(self) -> Option<Self>;
-    fn match_extract_creation_info(self) -> Option<Self>;
-    fn match_select_field(self, idx: u8) -> Option<Self>;
-    fn match_bool_to_sigma(self) -> Option<Self>;
-    fn match_collection(self, ty: &SType) -> Option<Vec<Self>>;
-    fn match_valuse(self, id: u32, ty: SType) -> Option<()>;
-    fn match_dlog(self) -> Option<Self>;
-    fn match_dhtuple(self) -> Option<(Self, Self, Self, Self)>;
-    fn match_extract_register(self, id: i8, ty: SType) -> Option<Self>;
-    fn match_global_var(self, var: GlobalVars) -> Option<()>;
-}
-
-impl Deconstruct for &Expr {
-    fn match_and(self) -> Option<Self> {
-        match self {
-            Expr::And(And { box input }) => Some(input),
-            _ => None,
-        }
-    }
-    fn match_sigma_and(self) -> Option<Vec<Self>> {
-        match self {
-            Expr::SigmaAnd(SigmaAnd { items }) => Some(items.iter().map(|x| x).collect()),
-            _ => None,
-        }
-    }
-    fn match_option_get(self) -> Option<Self> {
-        match self {
-            Expr::OptionGet(OptionGet { box input }) => Some(input),
-            _ => None,
-        }
-    }
-    fn match_sigma_or(self) -> Option<Vec<Self>> {
-        match self {
-            Expr::SigmaOr(SigmaOr { items }) => Some(items.iter().map(|x| x).collect()),
-            _ => None,
-        }
-    }
-    fn match_extract_creation_info(self) -> Option<Self> {
-        match self {
-            Expr::ExtractCreationInfo(ExtractCreationInfo { box input }) => Some(input),
-            _ => None,
-        }
-    }
-    fn match_select_field(self, idx: u8) -> Option<Self> {
-        let idx: TupleFieldIndex = idx.try_into().unwrap();
-        match self {
-            Expr::SelectField(SelectField {
-                input: box expr,
-                field_index: i,
-            }) if i == &idx => Some(expr),
-            _ => None,
-        }
-    }
-    fn match_bool_to_sigma(self) -> Option<Self> {
-        match self {
-            Expr::BoolToSigmaProp(BoolToSigmaProp { box input }) => Some(input),
-            _ => None,
-        }
-    }
-    fn match_collection(self, ty: &SType) -> Option<Vec<Self>> {
-        match self {
-            Expr::Collection(Collection::Exprs { elem_tpe, items }) if elem_tpe == ty => {
-                Some(items.iter().map(|x| x).collect())
-            }
-            _ => None,
-        }
-    }
-
-    fn match_valuse(self, id: u32, ty: SType) -> Option<()> {
-        match self {
-            Expr::ValUse(ValUse { val_id, tpe }) if val_id == &ValId(id) && tpe == &ty => Some(()),
-            _ => None,
-        }
-    }
-
-    fn match_dlog(self) -> Option<Self> {
-        match self {
-            Expr::CreateProveDlog(CreateProveDlog { box input }) => Some(input),
-            _ => None,
-        }
-    }
-    fn match_dhtuple(self) -> Option<(Self, Self, Self, Self)> {
-        match self {
-            Expr::CreateProveDhTuple(CreateProveDhTuple {
-                box gv,
-                box hv,
-                box uv,
-                box vv,
-            }) => Some((gv, hv, vv, uv)),
-            _ => None,
-        }
-    }
-
-    fn match_extract_register(self, id: i8, ty: SType) -> Option<Self> {
-        match self {
-            Expr::ExtractRegisterAs(ExtractRegisterAs {
-                box input,
-                register_id,
-                elem_tpe,
-            }) if register_id == &id && elem_tpe == &ty => Some(input),
-            _ => None,
-        }
-    }
-
-    fn match_global_var(self, var: GlobalVars) -> Option<()> {
-        match self {
-            Expr::GlobalVars(v) if v == &var => Some(()),
-            _ => None,
-        }
-    }
-}
 // impl Deconstruct for Expr {
 //     fn match_and(self) -> Option<Self> {
 //         match self {
@@ -177,68 +65,7 @@ impl Deconstruct for &Expr {
 //     }
 // }
 
-fn expect(e1: &Expr, e2: &Expr) -> Option<()> {
-    if e1 == e2 {
-        Some(())
-    } else {
-        None
-    }
-}
 
-fn match_const<'a>(e: &'a Expr, ty: &SType) -> Option<&'a Value> {
-    match e {
-        Expr::Const(Constant { tpe, v }) if tpe == ty => Some(v),
-        _ => None,
-    }
-}
-
-fn match_const_placeholder(e: &Expr, i: u32, ty: &SType) -> Option<()> {
-    match e {
-        Expr::ConstPlaceholder(ConstantPlaceholder { id, tpe }) if id == &i && tpe == ty => {
-            Some(())
-        }
-        _ => None,
-    }
-}
-
-fn match_block_value(e: &Expr) -> Option<(Vec<&Expr>, &Expr)> {
-    match e {
-        Expr::BlockValue(BlockValue { items, box result }) => {
-            Some((items.iter().map(|x| x).collect(), result))
-        }
-        _ => None,
-    }
-}
-fn match_binop(e: &Expr, op: BinOpKind) -> Option<(&Expr, &Expr)> {
-    match e {
-        Expr::BinOp(BinOp {
-            kind,
-            left: box a,
-            right: box b,
-        }) if kind == &op => Some((a, b)),
-        _ => None,
-    }
-}
-
-fn val_sigma_prop(v: &Value) -> Option<&SigmaBoolean> {
-    match v {
-        Value::SigmaProp(box p) => Some(p.value()),
-        _ => None,
-    }
-}
-
-fn match_vec3<T>(v: Vec<&T>) -> Option<(&T, &T, &T)> {
-    match &v[..] {
-        [a, b, c] => Some((a, b, c)),
-        _ => None,
-    }
-}
-fn match_vec2<T>(v: Vec<&T>) -> Option<(&T, &T)> {
-    match &v[..] {
-        [a, b] => Some((a, b)),
-        _ => None,
-    }
-}
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
     let v = match_const(e, &SType::SSigmaProp)?;
