@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 
 mod prettyprinter;
+mod testset;
 
 use ergotree_ir::mir::expr::{Expr, ToBoxedExprExt};
 use ergotree_ir::serialization::constant_store::ConstantStore;
