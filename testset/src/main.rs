@@ -53,6 +53,7 @@ use std::io::Cursor;
 
 
 use testset::matcher::*;
+use testset::errors::SErr;
 
 // ---------------------------------------------------------------
 
@@ -409,14 +410,6 @@ fn run_block_scan(blk_iter: rusqlite::Rows) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn with_db<F, A>(fun: F) -> rusqlite::Result<A>
-where
-    F: Fn(rusqlite::Connection) -> rusqlite::Result<A>,
-{
-    let conn = rusqlite::Connection::open("../ergvein/blocks.sqlite")?;
-    fun(conn)
-}
-
 fn query_plain<F, A>(conn: rusqlite::Connection, fun: F) -> rusqlite::Result<A>
 where
     F: Fn(rusqlite::Rows) -> rusqlite::Result<A>,
@@ -469,7 +462,7 @@ where
         .query(rusqlite::params![h])?)
 }
 
-fn main() {
+fn main() -> Result<(),SErr>{
     let matches = App::new("Ergo parse")
         .arg(
             Arg::with_name("height")
@@ -494,13 +487,15 @@ fn main() {
                 .takes_value(true),
         )
         .get_matches();
+    let conn = rusqlite::Connection::open("../ergvein/blocks.sqlite")?;
     if let Some(h) = matches.value_of("height") {
-        with_db(|conn| query_height(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+        query_height(conn, h.parse().unwrap(), run_block_scan)?;
     } else if let Some(h) = matches.value_of("h-lt") {
-        with_db(|conn| query_height_lt(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+        query_height_lt(conn, h.parse().unwrap(), run_block_scan)?;
     } else if let Some(h) = matches.value_of("h-gt") {
-        with_db(|conn| query_height_gt(conn, h.parse().unwrap(), run_block_scan)).unwrap();
+        query_height_gt(conn, h.parse().unwrap(), run_block_scan)?;
     } else {
-        with_db(|conn| query_plain(conn, run_block_scan)).unwrap();
+        query_plain(conn, run_block_scan)?;
     }
+    Ok(())
 }
