@@ -35,16 +35,6 @@ use rusqlite::ToSql;
 use testset::errors::SErr;
 use testset::matcher::*;
 
-// ---------------------------------------------------------------
-
-// impl Deconstruct for Expr {
-//     fn match_and(self) -> Option<Self> {
-//         match self {
-//             Expr::And(And { box input }) => Some(input),
-//             _ => None,
-//         }
-//     }
-// }
 
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
@@ -100,6 +90,8 @@ enum TxType {
     Tx105,
     Tx198,
     Tx228,
+    Tx251,
+    Tx261,
     Tx415,
     Tx450,
 }
@@ -110,6 +102,8 @@ struct Classifier {
     hash_b105: Digest32,
     hash_b198: Digest32,
     hash_b228: Digest32,
+    hash_b251: Digest32,
+    hash_b261: Digest32,
     hash_b415: Digest32,
     hash_b450: Digest32,
 }
@@ -122,6 +116,8 @@ impl Classifier {
         let hash_b105 = mk("922e50aa537eacdad7f0584dd703426d8f376d7623422afc3b212bd2f674e2b2");
         let hash_b198 = mk("441438d8b1a847e8cc6f8c19e43e6c63e516cf1e1db45f246c1b6e84f70e685f");
         let hash_b228 = mk("ac08c57ae9c761ffd023cf64d666228ca15f2e46f9b74171a445efa50b65d58c");
+        let hash_b251 = mk("c5e5cd8afc994181ea5f4b32e2aad6b2af2acbf797fdcb5e47a7bacb9d9c9386");
+        let hash_b261 = mk("d7e0ee6e86a01384211ad7d0f726364a1951a9b48be6663a6cab25f89287cb87");
         let hash_b450 = mk("25b9da55e8c2ef009c0196aa2caa1b9bba2755a9f2627b4d64c2928aad6e63af");
         let hash_b415 = mk("f7dfa8929aebc1a8f4b26ab5642f08daf28c93c7c73d4ea45da045b4e181ae73");
         Classifier {
@@ -130,6 +126,8 @@ impl Classifier {
             hash_b105,
             hash_b198,
             hash_b228,
+            hash_b251,
+            hash_b261,
             hash_b415,
             hash_b450,
         }
@@ -144,8 +142,8 @@ impl Check for Classifier {
         "Classifier"
     }
 
-    fn check(&mut self, tx: &TxData) {
-        for tx in tx.block.iter().flatten() {
+    fn check(&mut self, txdata: &TxData) {
+        for tx in txdata.block.iter().flatten() {
             for out in &tx.output_candidates {
                 // FIXME: Extremely ugly and dangerous
                 let expr = &**(out.ergo_tree.tree.as_ref().unwrap().root.as_ref().unwrap());
@@ -164,6 +162,10 @@ impl Check for Classifier {
                     self.bump_named(TxType::Tx198);
                 } else if n == 228 && h == self.hash_b228 {
                     self.bump_named(TxType::Tx228);
+                } else if n == 251 && h == self.hash_b251 {
+                    self.bump_named(TxType::Tx251);
+                } else if n == 261 && h == self.hash_b261 {
+                    self.bump_named(TxType::Tx261);
                 } else if n == 415 && h == self.hash_b415 {
                     self.bump_named(TxType::Tx415);
                 } else if n == 450 && h == self.hash_b450 {
@@ -176,9 +178,11 @@ impl Check for Classifier {
     }
 
     fn finalize(&self) {
-        let tot: u32 = self.named.iter().map(|(_, n)| *n).sum::<u32>()
-            + self.sized.iter().map(|(_, n)| *n).sum::<u32>();
-        println!("TOT = {}", tot);
+        let tot_named = self.named.iter().map(|(_, n)| *n).sum::<u32>();
+        let tot_sized =self.sized.iter().map(|(_, n)| *n).sum::<u32>();
+        let tot: u32 = tot_named + tot_sized;
+        println!("TOT        = {}", tot);
+        println!("Classified = {:.2}%", ((tot_named as f64) / (tot as f64))*100.0);
         // Named
         {
             let mut named = self.named.iter().collect::<Vec<_>>();
@@ -194,7 +198,7 @@ impl Check for Classifier {
             sized.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
             for (sz, n) in sized.iter() {
                 let f: f64 = (**n as f64) / (tot as f64);
-                if f > 1e-2 {
+                if f > 0.5e-2 {
                     println!("{:4} {:6} ({:.2}%)", sz, n, f * 100.0);
                 }
             }
