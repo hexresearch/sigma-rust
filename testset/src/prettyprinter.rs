@@ -106,6 +106,7 @@ impl Pretty for Expr {
             Expr::GetVar(_) => todo!(),
             Expr::DeserializeRegister(_) => todo!(),
             Expr::DeserializeContext(_) => todo!(),
+            Expr::MultiplyGroup(_) => todo!(),
         }
     }
 }
