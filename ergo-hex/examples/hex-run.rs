@@ -26,9 +26,9 @@ use ergo_lib::chain::{blake2b256_hash, Digest32};
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
-use rusqlite::ToSql;
 use ergo_hex::hex::errors::SErr;
 use ergo_hex::hex::matcher::*;
+use ergo_hex::hex::sql::Query;
 
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
@@ -292,39 +292,8 @@ impl TxData {
     }
 }
 
-
-struct Query<'a> {
-    stmt: rusqlite::Statement<'a>,
-    param: Vec<Box<dyn rusqlite::ToSql>>,
-}
-
-impl<'a> Query<'a> {
-    pub fn new_p(conn: &'a rusqlite::Connection, sql: &str) -> rusqlite::Result<Query<'a>> {
-        let stmt = conn.prepare(&sql)?;
-        Ok(Query {
-            stmt,
-            param: Vec::new(),
-        })
-    }
-
-    pub fn new(
-        conn: &'a rusqlite::Connection,
-        sql: &str,
-        param: Vec<Box<dyn rusqlite::ToSql>>,
-    ) -> rusqlite::Result<Query<'a>> {
-        let stmt = conn.prepare(&sql)?;
-        Ok(Query { stmt, param })
-    }
-
-    pub fn run(&mut self) -> rusqlite::Result<rusqlite::Rows> {
-        let params = self.param.iter().map(|x| &**x).collect::<Vec<_>>();
-        let params: &[&dyn ToSql] = params.as_ref();
-        self.stmt.query(params)
-    }
-}
-
 fn query_plain(conn: &rusqlite::Connection) -> rusqlite::Result<Query> {
-    Query::new_p(
+    Query::new_(
         conn,
         "SELECT height, txs FROM blocks \
                 WHERE txs IS NOT NULL \
