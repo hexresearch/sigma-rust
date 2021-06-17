@@ -1,15 +1,10 @@
 #![feature(box_patterns)]
 #![allow(non_camel_case_types)]
-mod prettyprinter;
-mod hex;
-
 use ergotree_ir::mir::expr::Expr;
 use ergotree_ir::serialization::constant_store::ConstantStore;
 use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::SerializationError;
 use ergotree_ir::serialization::SigmaSerializable;
-use prettyprinter::Pretty;
-
 use clap::{App, Arg};
 use ergo_lib::chain::transaction::Transaction;
 use ergotree_ir::mir::bin_op::{ArithOp, BinOpKind, RelationOp};
@@ -32,9 +27,8 @@ use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
 use rusqlite::ToSql;
-use hex::errors::SErr;
-use hex::matcher::*;
-
+use ergo_hex::hex::errors::SErr;
+use ergo_hex::hex::matcher::*;
 
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
