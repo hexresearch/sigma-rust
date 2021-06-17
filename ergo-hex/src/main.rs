@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 #![allow(non_camel_case_types)]
 mod prettyprinter;
-mod testset;
+mod hex;
 
 use ergotree_ir::mir::expr::Expr;
 use ergotree_ir::serialization::constant_store::ConstantStore;
@@ -32,8 +32,8 @@ use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
 use rusqlite::ToSql;
-use testset::errors::SErr;
-use testset::matcher::*;
+use hex::errors::SErr;
+use hex::matcher::*;
 
 
 // ---------------------------------------------------------------
