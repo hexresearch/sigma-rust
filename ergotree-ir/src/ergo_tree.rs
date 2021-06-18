@@ -25,7 +25,8 @@ use thiserror::Error;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ParsedTree {
-    constants: Vec<Constant>,
+    /// XX
+    pub constants: Vec<Constant>,
     /// XX
     pub root: Result<Rc<Expr>, ErgoTreeRootParsingError>,
 }
