@@ -1,8 +1,6 @@
 #![feature(box_patterns)]
 #![allow(non_camel_case_types)]
 use ergotree_ir::mir::expr::Expr;
-use ergotree_ir::serialization::constant_store::ConstantStore;
-use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::SerializationError;
 use ergotree_ir::serialization::SigmaSerializable;
 use clap::{App, Arg};
@@ -17,18 +15,17 @@ use ergotree_ir::sigma_protocol::sigma_boolean::SigmaBoolean;
 use ergotree_ir::sigma_protocol::sigma_boolean::{ProveDlog, SigmaProofOfKnowledgeTree};
 use ergotree_ir::types::stype::SType;
 use rusqlite;
-use sigma_ser::vlq_encode::ReadSigmaVlqExt;
 use sigma_ser::vlq_encode::WriteSigmaVlqExt;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 // use std::io;
 use ergo_lib::chain::{blake2b256_hash, Digest32};
 use std::convert::{TryFrom, TryInto};
-use std::io::Cursor;
 
 use ergo_hex::hex::errors::SErr;
 use ergo_hex::hex::matcher::*;
 use ergo_hex::hex::sql::Query;
+use ergo_hex::hex::parse;
 
 // ---------------------------------------------------------------
 fn is_36b_script(e: &Expr) -> Option<()> {
@@ -249,7 +246,7 @@ struct TxData {
 impl TxData {
     /// Create new TX data object
     pub fn new(h: u32, binary: Vec<u8>) -> TxData {
-        let res = Self::parse_block(&binary);
+        let res = parse::parse_block(&binary);
         let after_fork = match &res {
             Ok((a, _)) => *a,
             Err(_) => false,
@@ -268,27 +265,6 @@ impl TxData {
         if let Err(e) = &self.block {
             println!("H={} : {:?}", self.h, e);
         }
-    }
-
-    fn parse_block(binary: &Vec<u8>) -> Result<(bool, Vec<Transaction>), SerializationError> {
-        let cursor = Cursor::new(&binary);
-        let mut r = SigmaByteReader::new(cursor, ConstantStore::empty());
-        // Parse number of transactions
-        let (n_tx, after_fork) = {
-            let n = r.get_u32()?;
-            if n == 10000002 {
-                (r.get_u32()?, true)
-            } else {
-                (n, false)
-            }
-        };
-        //
-        let mut txs: Vec<Transaction> = Vec::with_capacity(n_tx as usize);
-        for _ in 0..n_tx {
-            let tx = Transaction::sigma_parse(&mut r)?;
-            txs.push(tx);
-        }
-        Ok((after_fork, txs))
     }
 }
 

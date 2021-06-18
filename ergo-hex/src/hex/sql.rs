@@ -1,5 +1,31 @@
 use rusqlite;
-use rusqlite::ToSql;
+use rusqlite::{ToSql, Connection};
+use std::path::Path;
+
+
+pub fn open<P: AsRef<Path>>(path: P) -> rusqlite::Result<Connection> {
+    let db = Connection::open(path)?;
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS transaction_list (\
+                id       INTEGER PRIMARY KEY AUTOINCREMENT, \
+                tx_h     INTEGER NOT NULL, \
+                tx_n     INTEGER NOT NULL, \
+                tx_id    BLOB    NOT NULL UNIQUE, \
+                tx_bytes BLOB    NOT NULL)",[])?;
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS outputs_list (\
+                id      INTEGER PRIMARY KEY, \
+                creator INTEGER NOT NULL,   \
+                out_n   INTEGER NOT NULL,   \
+                consts  BLOB    NOT NULL,   \
+                n_consts INTEGER NOT NULL,  \
+                script  BLOB    NOT NULL,   \
+                script_hash BLOB NOT NULL,  \
+                is_36b      BOOLEAN NOT NULL, \
+                UNIQUE(creator,out_n))",[])?;
+    Ok(db)
+}
+
 
 /// rusqlite uses somewhat weird API. Parameters are passed as references
 /// which makes it impossible to bundle them as prt of structure. To circumvent

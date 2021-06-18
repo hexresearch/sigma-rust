@@ -42,6 +42,12 @@ use ergotree_ir::types::sfunc::SFunc;
 use ergotree_ir::types::smethod::SMethod;
 use ergotree_ir::types::stype::SType;
 
+pub fn ppr<T: Pretty>(expr: &T, width: usize) -> String {
+    let mut w = Vec::new();
+    expr.pretty().render(width, &mut w).unwrap();
+    String::from_utf8(w).unwrap()
+}
+
 pub trait Pretty {
     fn pretty(&self) -> pretty::RcDoc;
 }

@@ -1,6 +1,7 @@
 use rusqlite;
 use std::io;
 use thiserror::Error;
+use ergotree_ir::serialization::SerializationError;
 
 #[derive(Error, Debug)]
 pub enum SErr {
@@ -10,4 +11,7 @@ pub enum SErr {
     /// SQLite error
     #[error("SQLite error: {0}")]
     SQLite(#[from] rusqlite::Error),
+    /// Serialization error for Sigma
+    #[error("Parse error: {0}")]
+    Parse(#[from] SerializationError)
 }
