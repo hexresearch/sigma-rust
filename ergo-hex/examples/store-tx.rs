@@ -24,7 +24,7 @@ fn main() -> Result<(), SErr> {
         let mut stmt_store =
             dbtx.prepare("INSERT OR IGNORE INTO transaction_list VALUES (NULL, ?,?,?,?)")?;
         let mut stmt_store_out =
-            dbtx.prepare("INSERT OR IGNORE INTO outputs_list VALUES (NULL, ?,?,?,?,?,?,?)")?;
+            dbtx.prepare("INSERT OR IGNORE INTO outputs_list VALUES (NULL, ?,?,?,?,?,?,?,?)")?;
         let mut stmt = dbtx.prepare("SELECT height, txs FROM blocks")?;
         let rows = stmt
             .query([])?
@@ -51,6 +51,7 @@ fn main() -> Result<(), SErr> {
                     stmt_store_out.execute(rusqlite::params![
                         tx_id,
                         n_out,
+                        out.value.as_u64(),
                         consts.sigma_serialize_bytes(),
                         consts.len(),
                         expr_bytes,

@@ -7,6 +7,7 @@ use ergotree_ir::mir::constant::Constant;
 use std::io::Cursor;
 use ergotree_ir::serialization::sigma_byte_reader::SigmaByteReader;
 use ergotree_ir::serialization::constant_store::ConstantStore;
+use ergo_lib::ergotree_ir::ergo_tree::ErgoTree;
 
 fn main() -> Result<(), SErr> {
     let matches = App::new("Ergo parse")
@@ -20,6 +21,13 @@ fn main() -> Result<(), SErr> {
                 .long("hash")
                 .value_name("HASH")
                 .help("Show script with given hash")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("decode")
+                .long("decode")
+                .value_name("BS")
+                .help("Decode bytestring")
                 .takes_value(true),
         )
         .get_matches();
@@ -56,6 +64,17 @@ fn main() -> Result<(), SErr> {
             let script = Expr::sigma_parse(&mut r)?;
             println!("{}", ppr(&script, 80));
         }
+    } else if let Some(bs) = matches.value_of("decode") {
+        let bs = base16::decode(bs).unwrap();
+        let tree = ErgoTree::sigma_parse_bytes(&bs)?;
+        let tree = &tree.tree.unwrap();
+        let consts = &tree.constants;
+        let expr = &**tree.root.as_ref().unwrap();
+        //
+        for (c,i) in consts.iter().zip(0..) {
+                println!("{:2}: {}", i, ppr(c,100));
+        }
+        println!("{}", ppr(expr, 80));
     }
     Ok(())
 }

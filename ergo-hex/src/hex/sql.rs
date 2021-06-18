@@ -17,6 +17,7 @@ pub fn open<P: AsRef<Path>>(path: P) -> rusqlite::Result<Connection> {
                 id      INTEGER PRIMARY KEY, \
                 creator INTEGER NOT NULL,   \
                 out_n   INTEGER NOT NULL,   \
+                value   INTEGER NOT NULL,   \
                 consts  BLOB    NOT NULL,   \
                 n_consts INTEGER NOT NULL,  \
                 script  BLOB    NOT NULL,   \

@@ -35,13 +35,16 @@ use ergotree_ir::mir::subst_const::SubstConstants;
 use ergotree_ir::mir::tuple::Tuple;
 use ergotree_ir::mir::val_def::ValDef;
 use ergotree_ir::mir::val_use::ValUse;
-use ergotree_ir::mir::value::Value;
+use ergotree_ir::mir::value::{NativeColl, Value};
 use ergotree_ir::sigma_protocol::sigma_boolean::{
     ProveDlog, SigmaBoolean, SigmaProofOfKnowledgeTree, SigmaProp,
 };
 use ergotree_ir::types::sfunc::SFunc;
 use ergotree_ir::types::smethod::SMethod;
 use ergotree_ir::types::stype::SType;
+use std::fmt::Display;
+use ergotree_ir::mir::upcast::Upcast;
+use ergotree_ir::mir::coll_exists::Exists;
 
 pub fn ppr<T: Pretty>(expr: &T, width: usize) -> String {
     let mut w = Vec::new();
@@ -56,13 +59,13 @@ pub trait Pretty {
     }
 }
 
-impl Pretty for Expr {
-    fn pretty_binop(&self, bop: bool) -> pretty::RcDoc {
-        self.pretty_binop(bop)
-    }
-}
+// impl Pretty for Expr {
+//     fn pretty_binop(&self, bop: bool) -> pretty::RcDoc {
+//         (&self).pretty_binop(bop)
+//     }
+// }
 
-impl Pretty for &Expr {
+impl Pretty for Expr {
     fn pretty_binop(&self, bop: bool) -> pretty::RcDoc {
         match self {
             Expr::Const(c) => c.pretty_binop(bop),
@@ -108,11 +111,11 @@ impl Pretty for &Expr {
             Expr::Map(_) => todo!(),
             Expr::Append(_) => todo!(),
             Expr::Filter(_) => todo!(),
-            Expr::Exists(_) => todo!(),
+            Expr::Exists(e) => e.pretty_binop(bop),
             Expr::ForAll(e) => e.pretty_binop(bop),
             Expr::SelectField(e) => e.pretty_binop(bop),
             Expr::BoolToSigmaProp(e) => e.pretty_binop(bop),
-            Expr::Upcast(_) => todo!(),
+            Expr::Upcast(e) => e.pretty_binop(bop),
             Expr::CreateProveDlog(e) => e.pretty_binop(bop),
             Expr::CreateProveDhTuple(e) => e.pretty_binop(bop),
             Expr::SigmaPropBytes(_) => todo!(),
@@ -162,7 +165,7 @@ fn ternary<'a>(name: &'a str, a: RcDoc<'a>, b: RcDoc<'a>, c: RcDoc<'a>) -> prett
         .append(RcDoc::text(","))
         .append(RcDoc::line())
         .append(c)
-        .append(RcDoc::line())
+        .append(RcDoc::line_())
         .append(RcDoc::text(")"))
         .nest(2)
         .group();
@@ -187,6 +190,7 @@ fn quaternary<'a>(
         .append(RcDoc::text(","))
         .append(RcDoc::line())
         .append(d)
+        .append(RcDoc::line_())
         .append(RcDoc::text(")"))
         .nest(2)
         .group();
@@ -268,10 +272,9 @@ impl Pretty for BlockValue {
 impl Pretty for PropertyCall {
     fn pretty_binop(&self, bop: bool) -> pretty::RcDoc {
         let e = self.obj.pretty_binop(bop);
-        let method = self.method.pretty_binop(false);
-        e.append(RcDoc::text("["))
-            .append(method)
-            .append(RcDoc::text("]"))
+        let method = self.method.name();
+        e.append(RcDoc::text("%"))
+            .append(RcDoc::text(method))
     }
 }
 
@@ -286,7 +289,7 @@ impl Pretty for If {
     }
 }
 impl Pretty for Tuple {
-    fn pretty_binop(&self, _bop:bool) -> pretty::RcDoc {
+    fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
         parens_comma(self.items.iter().map(|e| e.pretty()))
     }
 }
@@ -318,8 +321,8 @@ impl Pretty for ValDef {
 
 impl Pretty for ValUse {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
-        // FIXME:
-        RcDoc::text("VALUSE")
+        binary("ValUse", RcDoc::as_string(self.val_id.0),
+        self.tpe.pretty())
     }
 }
 
@@ -327,6 +330,17 @@ impl Pretty for ForAll {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
         ternary(
             "ForAll",
+            self.input.pretty_binop(false),
+            self.condition.pretty_binop(false),
+            self.elem_tpe.pretty_binop(false),
+        )
+    }
+}
+
+impl Pretty for Exists {
+    fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
+        ternary(
+            "Exists",
             self.input.pretty_binop(false),
             self.condition.pretty_binop(false),
             self.elem_tpe.pretty_binop(false),
@@ -378,22 +392,38 @@ impl Pretty for ByIndex {
         }
     }
 }
+
+fn simple_coll<'a, T: Display>(ty: &'a SType, elems: &'a [T]) -> RcDoc<'a> {
+    RcDoc::text("[")
+        .append(ty.pretty_binop(false))
+        .append(RcDoc::text("'|"))
+        .append(
+            RcDoc::line_()
+                .append(comma(elems.iter().map(|x| RcDoc::as_string(x))))
+                .append(RcDoc::text("]"))
+                .nest(2)
+                .group(),
+        )
+}
+
+fn typed_coll<'a, T: Pretty>(ty: &'a SType, elems: &'a Vec<T>) -> RcDoc<'a> {
+    RcDoc::text("[")
+        .append(ty.pretty_binop(false))
+        .append(RcDoc::text("|"))
+        .append(
+            RcDoc::line_()
+                .append(comma(elems.iter().map(|x| x.pretty())))
+                .append(RcDoc::text("]"))
+                .nest(2)
+                .group(),
+        )
+}
+
 impl Pretty for Collection {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
         match self {
-            Collection::BoolConstants(_) => todo!(),
-            Collection::Exprs { elem_tpe, items } => RcDoc::text("[")
-                .append(elem_tpe.pretty_binop(false))
-                .append(RcDoc::text("|"))
-                .append(
-                    RcDoc::line()
-                        .append(RcDoc::intersperse(
-                            items.iter().map(|x| x.pretty_binop(false)),
-                            RcDoc::text(",").append(RcDoc::line()),
-                        ))
-                        .nest(2)
-                        .group(),
-                ),
+            Collection::BoolConstants(bools) => simple_coll(&SType::SBoolean, bools),
+            Collection::Exprs { elem_tpe, items } => typed_coll(elem_tpe, items),
         }
     }
 }
@@ -411,6 +441,12 @@ impl Pretty for ConstantPlaceholder {
 impl Pretty for ExtractCreationInfo {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
         unary("ExtractCreationInfo", &self.input)
+    }
+}
+
+impl Pretty for Upcast {
+    fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
+        unary("Upcast", &self.input)
     }
 }
 
@@ -521,8 +557,7 @@ impl Pretty for BinOp {
         left.append(RcDoc::text(" "))
             .append(op)
             .append(RcDoc::text(" "))
-            .append(RcDoc::line_())
-            .append(right)
+            .append(RcDoc::line_().append(right).nest(2))
             .group()
     }
 }
@@ -569,52 +604,52 @@ impl Pretty for ArithOp {
 
 impl Pretty for SigmaAnd {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
-        RcDoc::text("SigmaAnd(")
+        let items = comma(self.items.iter().map(|x| x.pretty()));
+        RcDoc::text("SigmaAnd[")
             .append(
-                RcDoc::line()
-                    .append(RcDoc::intersperse(
-                        self.items.iter().map(|x| x.pretty_binop(false)),
-                        RcDoc::text(",").append(RcDoc::line()),
-                    ))
+                RcDoc::line_()
+                    .append(items)
+                    .append(RcDoc::line_())
+                    .append(RcDoc::text("]"))
                     .nest(2)
-                    .group(),
-            )
-            .append(")")
+                    .group())
     }
 }
 
 impl Pretty for SigmaOr {
     fn pretty_binop(&self, _bop: bool) -> pretty::RcDoc {
-        RcDoc::text("SigmaOr(")
+        let items = comma(self.items.iter().map(|x| x.pretty()));
+        RcDoc::text("SigmaOr[")
             .append(
-                RcDoc::line()
-                    .append(RcDoc::intersperse(
-                        self.items.iter().map(|x| x.pretty_binop(false)),
-                        RcDoc::text(",").append(RcDoc::line()),
-                    ))
+                RcDoc::line_()
+                    .append(items)
+                    .append(RcDoc::line_())
+                    .append(RcDoc::text("]"))
                     .nest(2)
-                    .group(),
-            )
-            .append(")")
+                    .group())
     }
 }
 
 impl Pretty for Value {
     fn pretty_binop(&self, bop: bool) -> pretty::RcDoc {
         match self {
-            Value::Boolean(_) => todo!(),
+            Value::Boolean(b) => RcDoc::as_string(b),
             Value::Byte(_) => todo!(),
             Value::Short(_) => todo!(),
             Value::Int(i) => RcDoc::as_string(i).append(RcDoc::text(":SInt")),
-            Value::Long(_) => todo!(),
+            Value::Long(i) => RcDoc::as_string(i).append(RcDoc::text(":SLong")),
             Value::BigInt(_) => todo!(),
             Value::GroupElement(_) => todo!(),
             Value::SigmaProp(p) => p.pretty_binop(bop),
             Value::CBox(_) => todo!(),
             Value::AvlTree => todo!(),
             Value::Coll(coll) => match coll {
-                CollKind::NativeColl(bytes) => RcDoc::text("[SByte|"),
-                CollKind::WrappedColl { elem_tpe, items } => todo!(),
+                CollKind::NativeColl(NativeColl::CollByte(bytes)) => {
+                    RcDoc::text("[BYTES|").append(RcDoc::text(base16::encode_lower(
+                        &bytes.iter().map(|x| *x as u8).collect::<Vec<_>>(),
+                    )))
+                }
+                CollKind::WrappedColl { elem_tpe, items } => typed_coll(elem_tpe, &items),
             },
             Value::Tup(_) => todo!(),
             Value::Context => todo!(),
@@ -673,7 +708,7 @@ impl Pretty for SType {
             SType::SSigmaProp => RcDoc::text("SSigmaProp"),
             SType::SBox => RcDoc::text("SBox"),
             SType::SAvlTree => todo!(),
-            SType::SOption(_) => todo!(),
+            SType::SOption(e) => RcDoc::text("Option<").append(e.pretty()).append(RcDoc::text(">")),
             SType::SColl(e) => RcDoc::text("Coll<")
                 .append(e.pretty_binop(false))
                 .append(RcDoc::text(">")),
@@ -692,13 +727,6 @@ impl Pretty for SFunc {
     fn pretty_binop(&self, _bop: bool) -> RcDoc {
         // FIXME
         RcDoc::text("FUNC")
-    }
-}
-
-impl Pretty for SMethod {
-    fn pretty_binop(&self, _bop: bool) -> RcDoc {
-        // FIXME
-        RcDoc::text("SMETHOD")
     }
 }
 
